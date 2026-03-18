@@ -1,0 +1,78 @@
+{
+  "name": "cypress-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for AI-driven Cypress test execution. Run, debug, and iterate on E2E tests directly from your AI agent.",
+  "type": "module",
+  "bin": {
+    "cypress-mcp": "./bin/cypress-mcp.mjs"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "bin",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/ test/",
+    "lint:fix": "eslint src/ test/ --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cypress",
+    "mcp",
+    "model-context-protocol",
+    "testing",
+    "e2e",
+    "ai-tools",
+    "test-automation",
+    "claude",
+    "cursor"
+  ],
+  "author": "Jamal Abdelkhalek",
+  "license": "BUSL-1.1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jams4code/cypress-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jams4code/cypress-mcp/issues"
+  },
+  "homepage": "https://github.com/jams4code/cypress-mcp#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "tinyglobby": "^0.2.11",
+    "tree-kill": "^1.2.2",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.2",
+    "@typescript-eslint/parser": "^8.57.2",
+    "eslint": "^9.26.0",
+    "prettier": "^3.5.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.1.0"
+  },
+  "peerDependencies": {
+    "cypress": ">=12.0.0"
+  },
+  "peerDependenciesMeta": {
+    "cypress": {
+      "optional": true
+    }
+  }
+}
