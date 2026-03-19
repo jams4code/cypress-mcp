@@ -1,0 +1,70 @@
+{
+  "stats": {
+    "suites": 1,
+    "tests": 3,
+    "passes": 1,
+    "pending": 1,
+    "failures": 1,
+    "start": "2026-03-20T21:00:00.000Z",
+    "end": "2026-03-20T21:00:15.000Z",
+    "duration": 15000
+  },
+  "tests": [
+    {
+      "title": "should login with valid credentials",
+      "fullTitle": "Login > should login with valid credentials",
+      "duration": 5000,
+      "currentRetry": 0,
+      "speed": "medium",
+      "err": {}
+    },
+    {
+      "title": "should show error on invalid password",
+      "fullTitle": "Login > should show error on invalid password",
+      "duration": 8000,
+      "currentRetry": 0,
+      "err": {
+        "message": "Timed out retrying after 4000ms: Expected to find content: 'Invalid credentials' but never did.",
+        "stack": "AssertionError: Timed out retrying\n    at Context.eval (webpack:///./cypress/e2e/login.cy.ts:25:5)"
+      }
+    },
+    {
+      "title": "should handle password reset",
+      "fullTitle": "Login > should handle password reset",
+      "duration": 0,
+      "currentRetry": 0,
+      "err": {}
+    }
+  ],
+  "pending": [
+    {
+      "title": "should handle password reset",
+      "fullTitle": "Login > should handle password reset",
+      "duration": 0,
+      "currentRetry": 0,
+      "err": {}
+    }
+  ],
+  "failures": [
+    {
+      "title": "should show error on invalid password",
+      "fullTitle": "Login > should show error on invalid password",
+      "duration": 8000,
+      "currentRetry": 0,
+      "err": {
+        "message": "Timed out retrying after 4000ms: Expected to find content: 'Invalid credentials' but never did.",
+        "stack": "AssertionError: Timed out retrying\n    at Context.eval (webpack:///./cypress/e2e/login.cy.ts:25:5)"
+      }
+    }
+  ],
+  "passes": [
+    {
+      "title": "should login with valid credentials",
+      "fullTitle": "Login > should login with valid credentials",
+      "duration": 5000,
+      "currentRetry": 0,
+      "speed": "medium",
+      "err": {}
+    }
+  ]
+}

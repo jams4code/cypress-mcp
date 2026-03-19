@@ -1,0 +1,50 @@
+{
+  "stats": {
+    "suites": 1,
+    "tests": 2,
+    "passes": 2,
+    "pending": 0,
+    "failures": 0,
+    "start": "2026-03-20T21:00:00.000Z",
+    "end": "2026-03-20T21:00:05.000Z",
+    "duration": 5000
+  },
+  "tests": [
+    {
+      "title": "should load the homepage",
+      "fullTitle": "Navigation > should load the homepage",
+      "duration": 2500,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "should navigate to about page",
+      "fullTitle": "Navigation > should navigate to about page",
+      "duration": 2500,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    }
+  ],
+  "pending": [],
+  "failures": [],
+  "passes": [
+    {
+      "title": "should load the homepage",
+      "fullTitle": "Navigation > should load the homepage",
+      "duration": 2500,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "should navigate to about page",
+      "fullTitle": "Navigation > should navigate to about page",
+      "duration": 2500,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    }
+  ]
+}

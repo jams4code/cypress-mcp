@@ -1,0 +1,44 @@
+{
+  "stats": {
+    "suites": 1,
+    "tests": 1,
+    "passes": 0,
+    "pending": 0,
+    "failures": 1,
+    "start": "2026-03-20T21:00:00.000Z",
+    "end": "2026-03-20T21:00:42.000Z",
+    "duration": 42000
+  },
+  "tests": [
+    {
+      "title": "should send the recipe to equipment",
+      "fullTitle": "QCS e2e test > should send the recipe to equipment",
+      "duration": 42000,
+      "currentRetry": 0,
+      "err": {
+        "message": "CypressError: cy.click() can only be called on a single element. Your subject contained 2 elements.",
+        "stack": "CypressError: cy.click() can only be called on a single element.\n    at mouseAction (cypress_runner.js:112650:68)",
+        "actual": "2",
+        "expected": "1",
+        "showDiff": true
+      }
+    }
+  ],
+  "pending": [],
+  "failures": [
+    {
+      "title": "should send the recipe to equipment",
+      "fullTitle": "QCS e2e test > should send the recipe to equipment",
+      "duration": 42000,
+      "currentRetry": 0,
+      "err": {
+        "message": "CypressError: cy.click() can only be called on a single element. Your subject contained 2 elements.",
+        "stack": "CypressError: cy.click() can only be called on a single element.\n    at mouseAction (cypress_runner.js:112650:68)",
+        "actual": "2",
+        "expected": "1",
+        "showDiff": true
+      }
+    }
+  ],
+  "passes": []
+}
