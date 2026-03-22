@@ -1,0 +1,8 @@
+{
+  "name": "test-fixture-project",
+  "version": "0.0.0",
+  "private": true,
+  "devDependencies": {
+    "cypress": "^14.0.0"
+  }
+}
