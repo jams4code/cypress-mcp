@@ -1,0 +1,9 @@
+{
+  "cypressConfigFile": "cypress.config.ts",
+  "defaultBrowser": "electron",
+  "defaultTimeout": 300000,
+  "screenshotsDir": "cypress/screenshots",
+  "downloadsDir": "cypress/downloads",
+  "authCommand": "npm run authenticate",
+  "authTokenPath": ".tmp/tokens.json"
+}
