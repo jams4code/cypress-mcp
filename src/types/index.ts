@@ -31,6 +31,7 @@ export type {
 } from "./results.js";
 
 // Service context passed to all tool handlers
+import type { CypressMcpConfig as Config } from "./config.js";
 import type { ProcessManager } from "../services/process-manager.js";
 import type { OutputParser } from "../services/output-parser.js";
 import type { ConfigLoader } from "../services/config-loader.js";
@@ -40,7 +41,7 @@ import type { StateStore } from "../services/state-store.js";
 import type { Logger } from "../utils/logger.js";
 
 export interface ToolContext {
-  readonly config: CypressMcpConfig;
+  readonly config: Config;
   readonly processManager: ProcessManager;
   readonly outputParser: OutputParser;
   readonly configLoader: ConfigLoader;

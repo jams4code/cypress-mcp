@@ -1,7 +1,6 @@
 // Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs/promises";
-import path from "node:path";
 import treeKill from "tree-kill";
 import type { CypressRunArgs } from "../types/cypress.js";
 import { CypressNotFoundError, TimeoutError } from "../utils/errors.js";
