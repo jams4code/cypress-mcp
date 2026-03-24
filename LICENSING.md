@@ -21,7 +21,9 @@ Examples that need a license:
 
 ## Commercial License
 
-Contact **jamal@jadev.dev** for commercial licensing.
+Contact **info@jadev-group.com** for commercial licensing.
+
+Licensed by **JADEV GROUP SARL** (BE1027.114.687), Brussels, Belgium.
 
 ## Future
 
