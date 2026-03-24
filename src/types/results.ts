@@ -1,3 +1,4 @@
+// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
 /** Normalized result from a Cypress test run */
 export interface CypressRunResult {
   readonly success: boolean;

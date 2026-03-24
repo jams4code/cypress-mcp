@@ -1,3 +1,4 @@
+// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { CypressMcpConfig, RawServerConfig } from "../types/config.js";

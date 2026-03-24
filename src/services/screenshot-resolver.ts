@@ -1,3 +1,4 @@
+// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
 import { glob } from "tinyglobby";
 import path from "node:path";
 import fs from "node:fs/promises";

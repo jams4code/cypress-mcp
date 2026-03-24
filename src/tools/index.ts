@@ -1,3 +1,4 @@
+// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../types/index.js";
 

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
 import type { MochaJsonReport } from "../types/cypress.js";
 import type {
   CypressRunResult,

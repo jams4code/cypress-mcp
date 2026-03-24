@@ -1,3 +1,4 @@
+// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
 /** Raw Mocha JSON reporter output from Cypress */
 export interface MochaJsonReport {
   readonly stats: MochaStats;
