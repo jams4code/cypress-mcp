@@ -28,7 +28,9 @@ export function register(server: McpServer, ctx: ToolContext): void {
       }
 
       const nextActions: string[] = [];
-      if (lastRun.result.failures.length > 0) {
+      if (lastRun.result.error) {
+        nextActions.push("cypress_doctor", "cypress_rerun_last");
+      } else if (lastRun.result.failures.length > 0) {
         nextActions.push("cypress_get_failure_context", "cypress_rerun_last");
       }
 

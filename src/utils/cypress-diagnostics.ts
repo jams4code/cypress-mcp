@@ -55,6 +55,9 @@ export function classifyConfigRuntimeCheck(
   };
 }
 
+const NOISE_PATTERN =
+  /^(DevTools listening|Opening [`']\/dev\/tty|tput:|={3,}|\s*$)/;
+
 function findDiagnosticWindow(output: string): string | null {
   const lines = output
     .replace(/\r\n/g, "\n")
@@ -70,7 +73,7 @@ function findDiagnosticWindow(output: string): string | null {
   const end = Math.min(lines.length, lineIndex + 6);
   const window = lines
     .slice(start, end)
-    .filter((line) => line.length > 0)
+    .filter((line) => line.length > 0 && !NOISE_PATTERN.test(line))
     .join("\n");
 
   return trimSnippet(window);

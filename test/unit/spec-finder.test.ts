@@ -31,4 +31,13 @@ describe("SpecFinder", () => {
 
     expect(count).toBe(3); // 2 it() + 1 it.skip()
   });
+
+  it("should accept an array of glob patterns", async () => {
+    const specs = await finder.findSpecs([
+      "cypress/e2e/**/*.cy.ts",
+      "does-not-exist/**/*.cy.ts",
+    ]);
+
+    expect(specs.some((s) => s.includes("sample.cy.ts"))).toBe(true);
+  });
 });

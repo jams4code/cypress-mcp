@@ -210,15 +210,6 @@ function normalizePatterns(value: string | readonly string[]): string[] {
   return patterns.map((pattern) => normalizePath(pattern));
 }
 
-function hasResolvedHints(hints: ConfigHints): boolean {
-  return Boolean(
-    hints.specPattern ||
-    hints.supportFile !== undefined ||
-    hints.screenshotsDir ||
-    hints.downloadsDir,
-  );
-}
-
 function extractConfigHints(content: string): ConfigHints {
   return {
     specPattern: extractStringList(content, "specPattern"),

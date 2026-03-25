@@ -42,6 +42,8 @@ export class StateStore {
 
     if (result.screenshots.length > 0) {
       this.screenshotIndex.set(spec, [...result.screenshots]);
+    } else {
+      this.screenshotIndex.delete(spec);
     }
 
     return record;

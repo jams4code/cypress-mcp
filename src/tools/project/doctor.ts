@@ -74,8 +74,10 @@ export function register(server: McpServer, ctx: ToolContext): void {
         }
 
         // 4. Cypress binary
+        let resolvedBinary: string | null = null;
         try {
           const binary = await ctx.processManager.resolveBinary();
+          resolvedBinary = binary;
           const detail = binary.includes("npx")
             ? "Using npx fallback"
             : normalizePath(path.relative(config.projectRoot, binary));
@@ -93,28 +95,36 @@ export function register(server: McpServer, ctx: ToolContext): void {
         }
 
         // 5. Config runtime validation
-        try {
-          const validation = await ctx.processManager.run({
-            spec: "__cypress_mcp_config_check__.cy.ts",
-            browser: config.defaultBrowser,
-            timeout: Math.min(config.defaultTimeout, 30_000),
-            configFile: config.cypressConfigFile,
-          });
-          const runtimeCheck = classifyConfigRuntimeCheck(
-            validation.exitCode,
-            validation.stdout,
-            validation.stderr,
-          );
-          checks.push({
-            check: "Config runtime",
-            status: runtimeCheck.status,
-            detail: runtimeCheck.detail,
-          });
-        } catch (err) {
+        if (resolvedBinary && !resolvedBinary.includes("npx")) {
+          try {
+            const validation = await ctx.processManager.run({
+              spec: "__cypress_mcp_config_check__.cy.ts",
+              browser: config.defaultBrowser,
+              timeout: Math.min(config.defaultTimeout, 30_000),
+              configFile: config.cypressConfigFile,
+            });
+            const runtimeCheck = classifyConfigRuntimeCheck(
+              validation.exitCode,
+              validation.stdout,
+              validation.stderr,
+            );
+            checks.push({
+              check: "Config runtime",
+              status: runtimeCheck.status,
+              detail: runtimeCheck.detail,
+            });
+          } catch (err) {
+            checks.push({
+              check: "Config runtime",
+              status: "warn",
+              detail: err instanceof Error ? err.message : String(err),
+            });
+          }
+        } else {
           checks.push({
             check: "Config runtime",
             status: "warn",
-            detail: err instanceof Error ? err.message : String(err),
+            detail: "Skipped because Cypress is being resolved through npx fallback.",
           });
         }
 

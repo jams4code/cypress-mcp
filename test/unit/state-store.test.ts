@@ -74,4 +74,20 @@ describe("StateStore", () => {
     expect(last?.args.grep).toBe("should login");
     expect(last?.args.browser).toBe("chrome");
   });
+
+  it("should clear stale screenshot entries after a clean rerun", () => {
+    const store = new StateStore();
+    store.recordRun("run_spec", "spec.cy.ts", mockArgs, mockResult, "", "");
+
+    store.recordRun(
+      "run_spec",
+      "spec.cy.ts",
+      mockArgs,
+      { ...mockResult, screenshots: [] },
+      "",
+      "",
+    );
+
+    expect(store.getScreenshots("spec.cy.ts")).toEqual([]);
+  });
 });

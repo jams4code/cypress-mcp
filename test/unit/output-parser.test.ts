@@ -73,4 +73,25 @@ ${JSON.stringify(passingFixture)}
     expect(result.success).toBe(false);
     expect(result.error).toContain("unknown");
   });
+
+  it("should surface config load errors instead of devtools noise", () => {
+    const stdout = [
+      "DevTools listening on ws://127.0.0.1:51906/devtools/browser/abc",
+      "Your configFile is invalid: C:\\project\\cypress.config.ts",
+      "",
+      "It threw an error when required, check the stack trace below:",
+      "",
+      "Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\project\\cypress\\cypress.config' imported from C:\\project\\cypress.config.ts",
+      "    at finalizeResolution (node:internal/modules/esm/resolve:274:11)",
+      "DevTools listening on ws://127.0.0.1:51906/devtools/browser/abc",
+    ].join("\n");
+
+    const result = parser.parse(stdout, "", 1);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Your configFile is invalid");
+    expect(result.error).toContain("ERR_MODULE_NOT_FOUND");
+    expect(result.error).not.toContain("Output: DevTools listening");
+    expect(result.stdoutTail).toBeDefined();
+  });
 });
