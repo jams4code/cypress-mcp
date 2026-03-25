@@ -94,13 +94,16 @@ AI agents can write Cypress tests but can't run them. Every change requires you 
 
 ## How It Works
 
-```
-AI Agent  ──stdio──>  cypress-mcp  ──spawn──>  Cypress
-                      (JSON-RPC)                (headless)
-                          |
-                    Parse JSON output
-                    Index screenshots
-                    Return structured result
+```mermaid
+graph LR
+    A[AI Agent] -->|stdio JSON-RPC| B[cypress-mcp]
+    B -->|child_process.spawn| C[Cypress Runtime]
+    C -->|JSON reporter| B
+    B -->|structured result| A
+
+    style A fill:#1a1a2e,stroke:#e94560,color:#fff
+    style B fill:#16213e,stroke:#0f3460,color:#fff
+    style C fill:#0f3460,stroke:#533483,color:#fff
 ```
 
 - **stdio transport** — the agent spawns the server as a child process
@@ -111,13 +114,22 @@ AI Agent  ──stdio──>  cypress-mcp  ──spawn──>  Cypress
 
 ## Agent Workflow
 
-```
-cypress_discover        -> understand what exists
-cypress_analyze_spec    -> deep-dive into one spec
-cypress_run_spec        -> run it, get structured results
-cypress_get_failure_context -> understand WHY it failed
-  (fix the code)
-cypress_rerun_last      -> verify the fix, zero friction
+```mermaid
+graph TD
+    D[cypress_discover] -->|map test suite| E[cypress_analyze_spec]
+    E -->|understand spec| F[cypress_run_spec]
+    F -->|tests fail| G[cypress_get_failure_context]
+    G -->|error + excerpt + screenshots| H[Fix the code]
+    H -->|iterate| I[cypress_rerun_last]
+    I -->|still failing| G
+    I -->|passing| J[Done]
+    F -->|tests pass| J
+
+    style D fill:#1a1a2e,stroke:#e94560,color:#fff
+    style F fill:#16213e,stroke:#0f3460,color:#fff
+    style G fill:#e94560,stroke:#fff,color:#fff
+    style I fill:#0f3460,stroke:#533483,color:#fff
+    style J fill:#2d6a4f,stroke:#40916c,color:#fff
 ```
 
 ## Configuration
