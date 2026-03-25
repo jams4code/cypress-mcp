@@ -36,7 +36,8 @@ export async function main(argv: string[]): Promise<void> {
       defaultTimeout: 300_000,
       screenshotsDir: "cypress/screenshots",
       downloadsDir: "cypress/downloads",
-      specPattern: "cypress/e2e/**/*.cy.{ts,js,tsx,jsx}",
+      specPattern: ["cypress/e2e/**/*.cy.{ts,js,tsx,jsx}"],
+      titleFilterSupport: false,
     };
   }
 

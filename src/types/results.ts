@@ -8,6 +8,8 @@ export interface CypressRunResult {
   readonly screenshots: readonly string[];
   readonly videos: readonly string[];
   readonly error?: string;
+  readonly stdoutTail?: string;
+  readonly stderrTail?: string;
 }
 
 export interface RunStats {

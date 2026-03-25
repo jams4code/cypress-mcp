@@ -13,15 +13,19 @@ export class SpecFinder {
   ) {}
 
   /** Find all spec files matching the pattern */
-  async findSpecs(pattern?: string): Promise<string[]> {
-    const searchPattern = pattern ?? "cypress/e2e/**/*.cy.{ts,js,tsx,jsx}";
-    const files = await glob([searchPattern], {
+  async findSpecs(pattern?: string | readonly string[]): Promise<string[]> {
+    const searchPatterns = pattern
+      ? Array.isArray(pattern)
+        ? [...pattern]
+        : [pattern]
+      : ["cypress/e2e/**/*.cy.{ts,js,tsx,jsx}"];
+    const files = await glob(searchPatterns, {
       cwd: this.projectRoot,
       absolute: false,
     });
 
     const sorted = files.map(normalizePath).sort();
-    this.logger.debug("Found specs", { count: sorted.length, pattern: searchPattern });
+    this.logger.debug("Found specs", { count: sorted.length, pattern: searchPatterns });
     return sorted;
   }
 

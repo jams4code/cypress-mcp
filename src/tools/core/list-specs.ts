@@ -9,7 +9,8 @@ export function register(server: McpServer, ctx: ToolContext): void {
     "List all Cypress spec files in the project. Returns file paths and test counts.",
     { pattern: z.string().optional().describe("Glob pattern to filter specs") },
     async ({ pattern }) => {
-      const specs = await ctx.specFinder.findSpecs(pattern);
+      const config = await ctx.configLoader.load();
+      const specs = await ctx.specFinder.findSpecs(pattern ?? config.specPattern);
       const results = await Promise.all(
         specs.map(async (file) => ({
           file,

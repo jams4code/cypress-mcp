@@ -12,7 +12,7 @@ export function register(server: McpServer, ctx: ToolContext): void {
     {},
     async () => {
       const config = await ctx.configLoader.load();
-      const specFiles = await ctx.specFinder.findSpecs();
+      const specFiles = await ctx.specFinder.findSpecs(config.specPattern);
 
       const specs: SpecSummary[] = await Promise.all(
         specFiles.map(async (file) => {

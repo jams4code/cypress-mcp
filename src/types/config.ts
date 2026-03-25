@@ -6,7 +6,9 @@ export interface CypressMcpConfig {
   readonly defaultTimeout: number;
   readonly screenshotsDir: string;
   readonly downloadsDir: string;
-  readonly specPattern: string;
+  readonly specPattern: readonly string[];
+  readonly supportFile?: string | false;
+  readonly titleFilterSupport: boolean;
   readonly authCommand?: string;
   readonly authTokenPath?: string;
   readonly env?: Readonly<Record<string, string>>;
@@ -18,6 +20,9 @@ export interface RawServerConfig {
   defaultTimeout?: number;
   screenshotsDir?: string;
   downloadsDir?: string;
+  specPattern?: string | readonly string[];
+  supportFile?: string | false;
+  titleFilterSupport?: boolean;
   authCommand?: string;
   authTokenPath?: string;
 }
@@ -28,7 +33,8 @@ export const DEFAULT_CONFIG: Omit<CypressMcpConfig, "projectRoot" | "cypressConf
     defaultTimeout: 300_000,
     screenshotsDir: "cypress/screenshots",
     downloadsDir: "cypress/downloads",
-    specPattern: "cypress/e2e/**/*.cy.{ts,js,tsx,jsx}",
+    specPattern: ["cypress/e2e/**/*.cy.{ts,js,tsx,jsx}"],
+    titleFilterSupport: false,
   };
 
 export const CYPRESS_CONFIG_FILES = [

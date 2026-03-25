@@ -4,6 +4,11 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../../types/index.js";
 import type { CypressRunArgs } from "../../types/cypress.js";
 import { CypressMcpError } from "../../utils/errors.js";
+import {
+  buildRunNextActions,
+  buildRunSummary,
+  enrichRunResult,
+} from "../../utils/run-results.js";
 
 export function register(server: McpServer, ctx: ToolContext): void {
   server.tool(
@@ -27,38 +32,21 @@ export function register(server: McpServer, ctx: ToolContext): void {
           headed,
           timeout: timeout ?? config.defaultTimeout,
           env,
+          configFile: config.cypressConfigFile,
         };
 
         const raw = await ctx.processManager.run(args);
         const result = ctx.outputParser.parse(raw.stdout, raw.stderr, raw.exitCode);
 
         const screenshots = await ctx.screenshotResolver.find(spec);
-        const enriched = {
-          ...result,
-          screenshots: screenshots.length > 0 ? screenshots : result.screenshots,
-        };
+        const enriched = enrichRunResult(
+          result,
+          screenshots.length > 0 ? screenshots : result.screenshots,
+        );
 
         const record = ctx.stateStore.recordRun(
           "run_spec", spec, args, enriched, raw.stdout, raw.stderr,
         );
-
-        const nextActions: string[] = [];
-        if (enriched.error) {
-          nextActions.push("cypress_doctor", "cypress_get_last_run");
-        } else if (enriched.stats.failing > 0) {
-          nextActions.push("cypress_get_failure_context", "cypress_get_screenshot");
-        } else if (enriched.stats.passing > 0) {
-          nextActions.push("cypress_discover");
-        }
-
-        let summary: string;
-        if (enriched.error) {
-          summary = `Cypress failed to start: ${enriched.error.slice(0, 150)}`;
-        } else if (enriched.success) {
-          summary = `All ${enriched.stats.passing} tests passed in ${spec}`;
-        } else {
-          summary = `${enriched.stats.failing} failing, ${enriched.stats.passing} passing in ${spec}`;
-        }
 
         return {
           content: [
@@ -68,9 +56,11 @@ export function register(server: McpServer, ctx: ToolContext): void {
                 ok: !enriched.error,
                 tool: "cypress_run_spec",
                 runId: record.runId,
-                summary,
+                summary: buildRunSummary(enriched, spec),
                 data: enriched,
-                nextActions,
+                nextActions: buildRunNextActions(enriched, {
+                  includeDiscoverOnSuccess: true,
+                }),
               }, null, 2),
             },
           ],

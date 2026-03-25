@@ -48,6 +48,8 @@ export function register(server: McpServer, ctx: ToolContext): void {
                   timestamp: new Date(lastRun.timestamp).toISOString(),
                   args: lastRun.args,
                   result: lastRun.result,
+                  stdoutTail: lastRun.stdoutTail || undefined,
+                  stderrTail: lastRun.stderrTail || undefined,
                 },
                 nextActions,
               },

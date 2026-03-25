@@ -44,4 +44,5 @@ export interface CypressRunArgs {
   readonly timeout?: number;
   readonly env?: Readonly<Record<string, string>>;
   readonly grep?: string;
+  readonly configFile?: string;
 }

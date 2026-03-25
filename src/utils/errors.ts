@@ -33,11 +33,15 @@ export class CypressNotFoundError extends CypressMcpError {
 }
 
 export class ConfigNotFoundError extends CypressMcpError {
-  constructor(projectRoot: string) {
+  constructor(projectRoot: string, configuredPath?: string) {
     super(
-      `No Cypress config file found in ${projectRoot}`,
+      configuredPath
+        ? `Configured Cypress config file was not found: ${configuredPath}`
+        : `No Cypress config file found in ${projectRoot}`,
       "CONFIG_NOT_FOUND",
-      "Create a cypress.config.ts or cypress.config.js file.",
+      configuredPath
+        ? "Check cypress-mcp.config.json and make sure the configured file exists."
+        : "Create a cypress.config.ts or cypress.config.js file.",
     );
     this.name = "ConfigNotFoundError";
   }
@@ -73,5 +77,16 @@ export class ProcessBusyError extends CypressMcpError {
       "Wait for the current run to finish, or use a longer timeout.",
     );
     this.name = "ProcessBusyError";
+  }
+}
+
+export class TitleFilterUnavailableError extends CypressMcpError {
+  constructor() {
+    super(
+      "cypress_run_test requires grep-based title filtering to be configured in the Cypress project.",
+      "TITLE_FILTER_UNAVAILABLE",
+      "Wire @cypress/grep (or an equivalent grep plugin) into the project, or set titleFilterSupport: true in cypress-mcp.config.json if filtering is already configured.",
+    );
+    this.name = "TitleFilterUnavailableError";
   }
 }

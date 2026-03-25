@@ -29,6 +29,34 @@ export function register(server: McpServer, ctx: ToolContext): void {
         };
       }
 
+      if (lastRun.result.error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  ok: false,
+                  tool: "cypress_get_failure_context",
+                  summary: `Last run crashed before tests executed in ${lastRun.spec}`,
+                  data: {
+                    runId: lastRun.runId,
+                    spec: lastRun.spec,
+                    error: lastRun.result.error,
+                    stdoutTail: lastRun.stdoutTail || undefined,
+                    stderrTail: lastRun.stderrTail || undefined,
+                  },
+                  nextActions: ["cypress_doctor", "cypress_get_last_run", "cypress_rerun_last"],
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+
       if (lastRun.result.failures.length === 0) {
         return {
           content: [

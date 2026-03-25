@@ -6,6 +6,7 @@ import type {
   TestResult,
   TestState,
 } from "../types/results.js";
+import { extractDiagnosticSnippet } from "../utils/cypress-diagnostics.js";
 import type { Logger } from "../utils/logger.js";
 
 export class OutputParser {
@@ -166,25 +167,7 @@ export class OutputParser {
     stderr: string,
     exitCode: number | null,
   ): CypressRunResult {
-    // Combine stderr + stdout for the best error message.
-    // Cypress writes config errors to stdout on some platforms.
-    // Filter out noise like "DevTools listening" and tput warnings.
-    const combined = [stderr.trim(), stdout.trim()]
-      .filter(Boolean)
-      .join("\n");
-    const filtered = combined
-      .split("\n")
-      .filter(
-        (l) =>
-          !l.includes("DevTools listening") &&
-          !l.includes("Opening `/dev/tty`") &&
-          !l.includes("tput:") &&
-          l.trim().length > 0,
-      )
-      .join("\n");
-    const errorLines = filtered || combined;
-    const truncated =
-      errorLines.length > 2000 ? errorLines.slice(-2000) : errorLines;
+    const diagnostic = extractDiagnosticSnippet(stdout, stderr);
 
     return {
       success: false,
@@ -200,7 +183,9 @@ export class OutputParser {
       failures: [],
       screenshots: [],
       videos: [],
-      error: `Cypress process exited with code ${exitCode ?? "unknown"}. Output: ${truncated}`,
+      error: `Cypress process exited with code ${exitCode ?? "unknown"}. Output: ${diagnostic}`,
+      stdoutTail: stdout.trim().slice(-2000) || undefined,
+      stderrTail: stderr.trim().slice(-2000) || undefined,
     };
   }
 }

@@ -32,12 +32,12 @@ export class ProcessManager {
   }
 
   async verify(): Promise<SpawnResult> {
-    const bin = await this.findBinary();
+    const bin = await this.resolveBinary();
     return this.spawnProcess(bin, ["verify"], 60_000);
   }
 
   async install(): Promise<SpawnResult> {
-    const bin = await this.findBinary();
+    const bin = await this.resolveBinary();
     return this.spawnProcess(bin, ["install"], 120_000);
   }
 
@@ -56,7 +56,7 @@ export class ProcessManager {
   }
 
   private async executeRun(args: CypressRunArgs): Promise<SpawnResult> {
-    const bin = await this.findBinary();
+    const bin = await this.resolveBinary();
     const cliArgs = this.buildArgs(args);
     const timeout = args.timeout ?? 300_000;
 
@@ -71,6 +71,10 @@ export class ProcessManager {
 
   private buildArgs(args: CypressRunArgs): string[] {
     const cliArgs = ["run", "--reporter", "json", "--spec", args.spec];
+
+    if (args.configFile) {
+      cliArgs.push("--config-file", args.configFile);
+    }
 
     if (args.browser) {
       cliArgs.push("--browser", args.browser);
@@ -96,7 +100,7 @@ export class ProcessManager {
     return cliArgs;
   }
 
-  private async findBinary(): Promise<string> {
+  async resolveBinary(): Promise<string> {
     const localBin = resolveCypressBin(this.projectRoot);
     try {
       await fs.access(localBin);
@@ -118,6 +122,11 @@ export class ProcessManager {
     const useShell = needsShell(bin);
 
     return new Promise<SpawnResult>((resolve, reject) => {
+      let timedOut = false;
+      let timeoutError: TimeoutError | null = null;
+      let forceKillTimer: NodeJS.Timeout | null = null;
+      let settled = false;
+
       const child = spawn(bin, finalArgs, {
         cwd: this.projectRoot,
         shell: useShell,
@@ -134,41 +143,67 @@ export class ProcessManager {
 
       const timer = setTimeout(() => {
         if (child.pid) {
+          timedOut = true;
+          timeoutError = new TimeoutError(timeout);
           this.logger.warn("Cypress process timed out, killing", {
             pid: child.pid,
             timeout,
           });
           treeKill(child.pid, "SIGTERM", () => {
             // If still alive after 5s, force kill
-            setTimeout(() => {
+            forceKillTimer = setTimeout(() => {
               if (child.pid) {
                 treeKill(child.pid, "SIGKILL");
               }
             }, 5000);
           });
         }
-        reject(new TimeoutError(timeout));
       }, timeout);
 
       child.on("close", (exitCode) => {
-        clearTimeout(timer);
-        this.activeProcess = null;
-        resolve({
-          stdout: Buffer.concat(stdoutChunks).toString("utf-8"),
-          stderr: Buffer.concat(stderrChunks).toString("utf-8"),
-          exitCode,
+        finish(() => {
+          if (timedOut && timeoutError) {
+            reject(timeoutError);
+            return;
+          }
+
+          resolve({
+            stdout: Buffer.concat(stdoutChunks).toString("utf-8"),
+            stderr: Buffer.concat(stderrChunks).toString("utf-8"),
+            exitCode,
+          });
         });
       });
 
       child.on("error", (err) => {
-        clearTimeout(timer);
-        this.activeProcess = null;
-        if (err.message.includes("ENOENT")) {
-          reject(new CypressNotFoundError(this.projectRoot));
-        } else {
+        finish(() => {
+          if (timedOut && timeoutError) {
+            reject(timeoutError);
+            return;
+          }
+
+          if (err.message.includes("ENOENT")) {
+            reject(new CypressNotFoundError(this.projectRoot));
+            return;
+          }
+
           reject(err);
-        }
+        });
       });
+
+      const finish = (callback: () => void): void => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        clearTimeout(timer);
+        if (forceKillTimer) {
+          clearTimeout(forceKillTimer);
+        }
+        this.activeProcess = null;
+        callback();
+      };
     });
   }
 }

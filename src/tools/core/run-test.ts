@@ -3,7 +3,15 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../../types/index.js";
 import type { CypressRunArgs } from "../../types/cypress.js";
-import { CypressMcpError } from "../../utils/errors.js";
+import {
+  CypressMcpError,
+  TitleFilterUnavailableError,
+} from "../../utils/errors.js";
+import {
+  buildRunNextActions,
+  buildRunSummary,
+  enrichRunResult,
+} from "../../utils/run-results.js";
 
 export function register(server: McpServer, ctx: ToolContext): void {
   server.tool(
@@ -19,42 +27,30 @@ export function register(server: McpServer, ctx: ToolContext): void {
       try {
         await ctx.specFinder.resolveSpec(spec);
         const config = await ctx.configLoader.load();
+        if (!config.titleFilterSupport) {
+          throw new TitleFilterUnavailableError();
+        }
 
         const args: CypressRunArgs = {
           spec,
           browser: browser ?? config.defaultBrowser,
           timeout: timeout ?? config.defaultTimeout,
           grep: testName,
+          configFile: config.cypressConfigFile,
         };
 
         const raw = await ctx.processManager.run(args);
         const result = ctx.outputParser.parse(raw.stdout, raw.stderr, raw.exitCode);
 
         const screenshots = await ctx.screenshotResolver.find(spec, testName);
-        const enriched = {
-          ...result,
-          screenshots: screenshots.length > 0 ? screenshots : result.screenshots,
-        };
+        const enriched = enrichRunResult(
+          result,
+          screenshots.length > 0 ? screenshots : result.screenshots,
+        );
 
         const record = ctx.stateStore.recordRun(
           "run_test", spec, args, enriched, raw.stdout, raw.stderr,
         );
-
-        const nextActions: string[] = [];
-        if (enriched.error) {
-          nextActions.push("cypress_doctor", "cypress_get_last_run");
-        } else if (enriched.stats.failing > 0) {
-          nextActions.push("cypress_get_failure_context", "cypress_get_screenshot");
-        }
-
-        let summary: string;
-        if (enriched.error) {
-          summary = `Cypress failed to start: ${enriched.error.slice(0, 150)}`;
-        } else if (enriched.success) {
-          summary = `Test "${testName}" passed in ${spec}`;
-        } else {
-          summary = `Test "${testName}" failed in ${spec}`;
-        }
 
         return {
           content: [
@@ -64,9 +60,9 @@ export function register(server: McpServer, ctx: ToolContext): void {
                 ok: !enriched.error,
                 tool: "cypress_run_test",
                 runId: record.runId,
-                summary,
+                summary: buildRunSummary(enriched, spec, testName),
                 data: enriched,
-                nextActions,
+                nextActions: buildRunNextActions(enriched),
               }, null, 2),
             },
           ],

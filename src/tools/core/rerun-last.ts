@@ -2,6 +2,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../../types/index.js";
 import { CypressMcpError } from "../../utils/errors.js";
+import {
+  buildRunNextActions,
+  buildRunSummary,
+  enrichRunResult,
+} from "../../utils/run-results.js";
 
 export function register(server: McpServer, ctx: ToolContext): void {
   server.tool(
@@ -36,23 +41,14 @@ export function register(server: McpServer, ctx: ToolContext): void {
           lastRun.spec,
           lastRun.args.grep,
         );
-        const enriched = {
-          ...result,
-          screenshots: screenshots.length > 0 ? screenshots : result.screenshots,
-        };
+        const enriched = enrichRunResult(
+          result,
+          screenshots.length > 0 ? screenshots : result.screenshots,
+        );
 
         const record = ctx.stateStore.recordRun(
           lastRun.kind, lastRun.spec, lastRun.args, enriched, raw.stdout, raw.stderr,
         );
-
-        const nextActions: string[] = [];
-        if (enriched.stats.failing > 0) {
-          nextActions.push("cypress_get_failure_context");
-        }
-
-        const summary = enriched.success
-          ? `Rerun passed: ${enriched.stats.passing} tests in ${lastRun.spec}`
-          : `Rerun: ${enriched.stats.failing} still failing in ${lastRun.spec}`;
 
         return {
           content: [
@@ -62,10 +58,10 @@ export function register(server: McpServer, ctx: ToolContext): void {
                 ok: !enriched.error,
                 tool: "cypress_rerun_last",
                 runId: record.runId,
-                summary,
+                summary: buildRunSummary(enriched, lastRun.spec, lastRun.args.grep),
                 previousRunId: lastRun.runId,
                 data: enriched,
-                nextActions,
+                nextActions: buildRunNextActions(enriched),
               }, null, 2),
             },
           ],

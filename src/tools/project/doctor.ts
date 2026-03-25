@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../../types/index.js";
+import { classifyConfigRuntimeCheck } from "../../utils/cypress-diagnostics.js";
 import { normalizePath } from "../../utils/paths.js";
 
 const SUPPORT_FILES = [
@@ -30,18 +31,33 @@ export function register(server: McpServer, ctx: ToolContext): void {
         });
 
         // 2. Spec files
-        const specs = await ctx.specFinder.findSpecs();
+        const specs = await ctx.specFinder.findSpecs(config.specPattern);
         checks.push({
           check: "Spec files",
           status: specs.length > 0 ? "ok" : "warn",
           detail: specs.length > 0
             ? `${specs.length} spec files found`
-            : "No spec files found matching default pattern",
+            : `No spec files found matching ${config.specPattern.join(", ")}`,
         });
 
         // 3. Support file
-        let supportFound = false;
-        for (const sf of SUPPORT_FILES) {
+        const configuredSupportFiles =
+          typeof config.supportFile === "string"
+            ? [config.supportFile]
+            : config.supportFile === false
+              ? []
+              : SUPPORT_FILES;
+
+        let supportFound = config.supportFile === false;
+        if (config.supportFile === false) {
+          checks.push({
+            check: "Support file",
+            status: "ok",
+            detail: "Disabled by Cypress config",
+          });
+        }
+
+        for (const sf of configuredSupportFiles) {
           try {
             await fs.access(path.join(config.projectRoot, sf));
             checks.push({ check: "Support file", status: "ok", detail: sf });
@@ -53,20 +69,20 @@ export function register(server: McpServer, ctx: ToolContext): void {
           checks.push({
             check: "Support file",
             status: "warn",
-            detail: "Not found (cypress/support/e2e.ts or .js)",
+            detail: `Not found (${configuredSupportFiles.join(", ")})`,
           });
         }
 
         // 4. Cypress binary
-        const cypressDir = path.join(config.projectRoot, "node_modules", "cypress");
         try {
-          await fs.access(cypressDir);
-          const pkgRaw = await fs.readFile(path.join(cypressDir, "package.json"), "utf-8");
-          const pkg: { version?: string } = JSON.parse(pkgRaw);
+          const binary = await ctx.processManager.resolveBinary();
+          const detail = binary.includes("npx")
+            ? "Using npx fallback"
+            : normalizePath(path.relative(config.projectRoot, binary));
           checks.push({
             check: "Cypress binary",
             status: "ok",
-            detail: `v${pkg.version ?? "unknown"}`,
+            detail,
           });
         } catch {
           checks.push({
@@ -76,7 +92,42 @@ export function register(server: McpServer, ctx: ToolContext): void {
           });
         }
 
-        // 5. Screenshots dir
+        // 5. Config runtime validation
+        try {
+          const validation = await ctx.processManager.run({
+            spec: "__cypress_mcp_config_check__.cy.ts",
+            browser: config.defaultBrowser,
+            timeout: Math.min(config.defaultTimeout, 30_000),
+            configFile: config.cypressConfigFile,
+          });
+          const runtimeCheck = classifyConfigRuntimeCheck(
+            validation.exitCode,
+            validation.stdout,
+            validation.stderr,
+          );
+          checks.push({
+            check: "Config runtime",
+            status: runtimeCheck.status,
+            detail: runtimeCheck.detail,
+          });
+        } catch (err) {
+          checks.push({
+            check: "Config runtime",
+            status: "warn",
+            detail: err instanceof Error ? err.message : String(err),
+          });
+        }
+
+        // 6. Title filter support
+        checks.push({
+          check: "Test title filter",
+          status: config.titleFilterSupport ? "ok" : "warn",
+          detail: config.titleFilterSupport
+            ? "Configured for cypress_run_test"
+            : "Not configured. Use cypress_run_spec or add @cypress/grep.",
+        });
+
+        // 7. Screenshots dir
         const ssDir = path.join(config.projectRoot, config.screenshotsDir);
         try {
           await fs.access(ssDir);
@@ -93,7 +144,7 @@ export function register(server: McpServer, ctx: ToolContext): void {
           });
         }
 
-        // 6. Downloads dir
+        // 8. Downloads dir
         const dlDir = path.join(config.projectRoot, config.downloadsDir);
         try {
           await fs.access(dlDir);
