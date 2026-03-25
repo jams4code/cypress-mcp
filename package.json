@@ -1,6 +1,6 @@
 {
   "name": "cypress-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for AI-driven Cypress test execution. Run, debug, and iterate on E2E tests directly from your AI agent.",
   "type": "module",
   "bin": {
