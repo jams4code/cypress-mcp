@@ -41,13 +41,20 @@ export function register(server: McpServer, ctx: ToolContext): void {
         );
 
         const nextActions: string[] = [];
-        if (enriched.stats.failing > 0) {
+        if (enriched.error) {
+          nextActions.push("cypress_doctor", "cypress_get_last_run");
+        } else if (enriched.stats.failing > 0) {
           nextActions.push("cypress_get_failure_context", "cypress_get_screenshot");
         }
 
-        const summary = enriched.success
-          ? `Test "${testName}" passed in ${spec}`
-          : `Test "${testName}" failed in ${spec}`;
+        let summary: string;
+        if (enriched.error) {
+          summary = `Cypress failed to start: ${enriched.error.slice(0, 150)}`;
+        } else if (enriched.success) {
+          summary = `Test "${testName}" passed in ${spec}`;
+        } else {
+          summary = `Test "${testName}" failed in ${spec}`;
+        }
 
         return {
           content: [

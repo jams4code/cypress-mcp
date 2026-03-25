@@ -43,16 +43,22 @@ export function register(server: McpServer, ctx: ToolContext): void {
         );
 
         const nextActions: string[] = [];
-        if (enriched.stats.failing > 0) {
+        if (enriched.error) {
+          nextActions.push("cypress_doctor", "cypress_get_last_run");
+        } else if (enriched.stats.failing > 0) {
           nextActions.push("cypress_get_failure_context", "cypress_get_screenshot");
-        }
-        if (enriched.stats.failing === 0 && enriched.stats.passing > 0) {
+        } else if (enriched.stats.passing > 0) {
           nextActions.push("cypress_discover");
         }
 
-        const summary = enriched.success
-          ? `All ${enriched.stats.passing} tests passed in ${spec}`
-          : `${enriched.stats.failing} failing, ${enriched.stats.passing} passing in ${spec}`;
+        let summary: string;
+        if (enriched.error) {
+          summary = `Cypress failed to start: ${enriched.error.slice(0, 150)}`;
+        } else if (enriched.success) {
+          summary = `All ${enriched.stats.passing} tests passed in ${spec}`;
+        } else {
+          summary = `${enriched.stats.failing} failing, ${enriched.stats.passing} passing in ${spec}`;
+        }
 
         return {
           content: [
