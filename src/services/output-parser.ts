@@ -166,7 +166,23 @@ export class OutputParser {
     stderr: string,
     exitCode: number | null,
   ): CypressRunResult {
-    const errorLines = stderr.trim() || stdout.trim();
+    // Combine stderr + stdout for the best error message.
+    // Cypress writes config errors to stdout on some platforms.
+    // Filter out noise like "DevTools listening" and tput warnings.
+    const combined = [stderr.trim(), stdout.trim()]
+      .filter(Boolean)
+      .join("\n");
+    const filtered = combined
+      .split("\n")
+      .filter(
+        (l) =>
+          !l.includes("DevTools listening") &&
+          !l.includes("Opening `/dev/tty`") &&
+          !l.includes("tput:") &&
+          l.trim().length > 0,
+      )
+      .join("\n");
+    const errorLines = filtered || combined;
     const truncated =
       errorLines.length > 2000 ? errorLines.slice(-2000) : errorLines;
 
