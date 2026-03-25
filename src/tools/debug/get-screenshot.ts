@@ -14,25 +14,29 @@ export function register(server: McpServer, ctx: ToolContext): void {
     async ({ spec, testName }) => {
       const screenshots = await ctx.screenshotResolver.find(spec, testName);
 
-      if (screenshots.length === 0) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({
-                screenshots: [],
-                message: "No screenshots found. Run a test first or check the spec/test name.",
-              }),
-            },
-          ],
-        };
-      }
+      const summary =
+        screenshots.length === 0
+          ? "No screenshots found. Run a test first or check the spec/test name."
+          : `Found ${screenshots.length} screenshot(s)`;
 
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ screenshots, count: screenshots.length }, null, 2),
+            text: JSON.stringify(
+              {
+                ok: true,
+                tool: "cypress_get_screenshot",
+                summary,
+                data: { screenshots, count: screenshots.length },
+                nextActions:
+                  screenshots.length > 0
+                    ? ["cypress_get_failure_context", "cypress_rerun_last"]
+                    : ["cypress_run_spec"],
+              },
+              null,
+              2,
+            ),
           },
         ],
       };

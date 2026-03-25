@@ -14,7 +14,7 @@ import { register as getFailureContext } from "./debug/get-failure-context.js";
 import { register as getScreenshot } from "./debug/get-screenshot.js";
 
 // Environment and setup
-import { register as getEnv } from "./auth/get-env.js";
+import { register as getEnv } from "./setup/get-env.js";
 import { register as doctor } from "./project/doctor.js";
 
 export function registerAllTools(server: McpServer, ctx: ToolContext): void {

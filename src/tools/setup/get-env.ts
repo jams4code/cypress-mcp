@@ -24,7 +24,17 @@ export function register(server: McpServer, ctx: ToolContext): void {
             content: [
               {
                 type: "text" as const,
-                text: JSON.stringify({ env: sanitized, path: envPath }, null, 2),
+                text: JSON.stringify(
+                  {
+                    ok: true,
+                    tool: "cypress_get_env",
+                    summary: `Loaded ${Object.keys(sanitized).length} env variables (secrets masked)`,
+                    data: { env: sanitized, path: envPath },
+                    nextActions: ["cypress_doctor", "cypress_run_spec"],
+                  },
+                  null,
+                  2,
+                ),
               },
             ],
           };
@@ -32,7 +42,16 @@ export function register(server: McpServer, ctx: ToolContext): void {
 
         return {
           content: [
-            { type: "text" as const, text: JSON.stringify({ env: parsed }) },
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                ok: false,
+                tool: "cypress_get_env",
+                summary: "cypress.env.json has invalid format",
+                data: null,
+                nextActions: ["cypress_doctor"],
+              }),
+            },
           ],
         };
       } catch {
@@ -41,8 +60,11 @@ export function register(server: McpServer, ctx: ToolContext): void {
             {
               type: "text" as const,
               text: JSON.stringify({
-                env: null,
-                message: "No cypress.env.json found or file is invalid.",
+                ok: false,
+                tool: "cypress_get_env",
+                summary: "No cypress.env.json found or file is invalid",
+                data: null,
+                nextActions: ["cypress_doctor"],
               }),
             },
           ],
