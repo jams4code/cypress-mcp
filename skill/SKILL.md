@@ -1,8 +1,8 @@
 ---
 name: cypress-testing
-description: Guide for AI agents to efficiently discover, run, debug, and iterate on Cypress E2E tests via the cypress-mcp server. Covers the full write-run-inspect-fix-rerun loop.
+description: Complete guide for AI agents to do frontend E2E testing SDLC with cypress-mcp — discover, write, run, debug, iterate, and regression test Cypress specs without leaving the conversation.
 metadata:
-  priority: 8
+  priority: 9
   pathPatterns:
     - '*.cy.ts'
     - '*.cy.js'
@@ -10,9 +10,11 @@ metadata:
     - '*.cy.jsx'
     - 'cypress/**'
     - 'cypress.config.*'
+    - 'cypress-mcp.config.json'
   bashPatterns:
     - 'cypress'
     - 'cy\.'
+    - 'cypress-mcp'
   importPatterns: []
   promptSignals:
     phrases:
@@ -21,87 +23,138 @@ metadata:
       - "run test"
       - "debug test"
       - "test failure"
+      - "write test"
+      - "test this feature"
+      - "run the tests"
+      - "why is this test failing"
+      - "screenshot"
     allOf: []
     anyOf: []
     noneOf: []
-    minScore: 6
+    minScore: 5
 ---
 
-# Cypress Testing with cypress-mcp
+# Frontend E2E Testing SDLC with cypress-mcp
 
-## The Loop
+## Core Principle
 
-The core workflow is: **discover → run → inspect → fix → rerun**
+The product is the **discover → write → run → inspect → fix → rerun** loop. Every tool exists to make one step of that loop faster. `cypress_run_spec` is the source of truth — if the test passes, the feature works.
+
+## Quick Reference
+
+| When | Tool |
+|------|------|
+| Starting work | `cypress_doctor` → `cypress_discover` |
+| Understanding a spec | `cypress_analyze_spec` |
+| Listing specs | `cypress_list_specs` |
+| Running tests | `cypress_run_spec` or `cypress_run_test` |
+| Test failed | `cypress_get_failure_context` (one call = everything you need) |
+| See failure visually | `cypress_get_screenshot` (read the image file directly) |
+| After fixing code | `cypress_rerun_last` (replays exact last command) |
+| Check full results | `cypress_get_last_run` |
+| Check env config | `cypress_get_env` |
+
+## Phase 1: Start Every Session
 
 ```
-cypress_discover          → understand what exists
-cypress_analyze_spec      → deep-dive into one spec
-cypress_run_spec          → run it, get structured results
-cypress_get_failure_context → understand WHY it failed
-  (fix the code)
-cypress_rerun_last        → verify the fix, zero friction
+cypress_doctor         → is the project healthy?
+cypress_discover       → what tests exist? what's the coverage?
 ```
 
-## When to Use Each Tool
+Never skip discovery. Never guess what tests exist. The AI must understand the test landscape before writing or running anything.
 
-### 1. Starting a Session
+## Phase 2: Write Tests
 
-Always begin with `cypress_doctor` to verify the project is healthy, then `cypress_discover` to map the test suite.
+### Before writing
+1. `cypress_discover` — see existing coverage, find gaps
+2. `cypress_analyze_spec` — study a similar spec to understand the project's conventions (page objects, selectors, helpers, hooks)
+3. Follow the existing patterns — don't invent new patterns unless the project has none
 
-### 2. Writing New Tests
+### Writing conventions
+- **One spec per feature area** — `login.cy.ts`, `checkout.cy.ts`, `dashboard.cy.ts`
+- **Use data attributes for selectors** — `cy.get('[data-cy="submit"]')` or `cy.get('[data-test="submit"]')`, never CSS classes
+- **Name tests clearly** — `"should show error when password is invalid"`, not `"test 2"`
+- **Describe blocks match feature areas** — `describe("Login Page", () => { ... })`
+- **Use beforeEach for common setup** — navigation, auth, test data
+- **Keep tests independent** — each test should work in isolation
 
-1. `cypress_discover` — see existing test coverage
-2. `cypress_analyze_spec` — understand patterns in similar specs
-3. Write the test
-4. `cypress_run_spec` — run it immediately
-5. `cypress_get_failure_context` — if it fails, get the full context
-6. Fix and `cypress_rerun_last`
+### Test structure
+```typescript
+describe("Feature Name", () => {
+  beforeEach(() => {
+    cy.visit("/feature-page");
+    // setup: auth, test data, intercepts
+  });
 
-### 3. Debugging a Failure
+  it("should do the happy path", () => {
+    // action + assertion
+  });
 
-1. `cypress_run_spec` or `cypress_run_test` — reproduce the failure
-2. `cypress_get_failure_context` — get error, stack hint, spec excerpt, screenshots
-3. `cypress_get_screenshot` — view the failure screenshot (multimodal agents)
-4. Fix the code based on the context
-5. `cypress_rerun_last` — verify without reconstructing args
+  it("should handle the error case", () => {
+    // intercept API to return error
+    // verify error UI
+  });
+});
+```
 
-### 4. Iterating on a Fix
+## Phase 3: Run and Debug
 
-Just use `cypress_rerun_last` repeatedly after each code change. It replays the exact same command. No need to remember the spec path or test name.
+### The debug loop
+```
+cypress_run_spec              → run the spec
+  ↓ fails?
+cypress_get_failure_context   → get error + stack + spec excerpt + screenshots
+  ↓ read screenshot if needed
+cypress_get_screenshot        → view what the browser actually showed
+  ↓ fix the code
+cypress_rerun_last            → verify fix (zero friction, replays exact args)
+  ↓ still failing? → back to get_failure_context
+  ↓ passing? → done
+```
 
-## Tool Reference (11 tools)
+### Key behaviors
+- **`cypress_get_failure_context`** is the most important debugging tool. One call returns: failing test title, error message, stack hint pointing to user code, spec excerpt around the failure, screenshot paths, and recommended next actions. Always use this instead of manually parsing run results.
+- **`cypress_rerun_last`** replays the exact previous `run_spec` or `run_test` invocation from state. Use it after every fix attempt — no need to remember spec paths or test names.
+- **`cypress_get_screenshot`** returns absolute file paths. Multimodal agents should read the image file directly to see what the browser rendered at failure time.
 
-### Discovery
-| Tool | When to Use |
-|------|------------|
-| `cypress_discover` | First thing. Maps all specs, test names, counts. |
-| `cypress_analyze_spec` | Deep-dive into one spec: describes, visits, intercepts, fixtures, custom commands. |
-| `cypress_list_specs` | Quick list of spec file paths with test counts. |
+### When Cypress can't start
+If `cypress_run_spec` returns `"Cypress failed to start"`:
+1. Run `cypress_doctor` to diagnose
+2. Common causes: missing config file, Node version mismatch, missing dependencies, config import errors
+3. The error message includes the actual Cypress output (DevTools noise is filtered)
 
-### Execution
-| Tool | When to Use |
-|------|------------|
-| `cypress_run_spec` | Run an entire spec file. Returns structured results with nextActions. |
-| `cypress_run_test` | Run one specific test by name (grep filter). |
-| `cypress_rerun_last` | Replay the exact last run. Use after fixing code. |
+## Phase 4: Full Feature SDLC
 
-### Inspection
-| Tool | When to Use |
-|------|------------|
-| `cypress_get_failure_context` | The key debugging tool. Returns error, stack hint, spec excerpt, screenshots, and suggested next actions in one call. |
-| `cypress_get_last_run` | Full structured results of the most recent run. |
-| `cypress_get_screenshot` | Find failure screenshots by spec or test name. |
+When implementing a new frontend feature end-to-end:
 
-### Setup
-| Tool | When to Use |
-|------|------------|
-| `cypress_get_env` | View cypress.env.json with secrets masked. |
-| `cypress_doctor` | Health check: config, binary, specs, support file. |
+1. **Discover** — `cypress_discover` to see current test coverage
+2. **Analyze** — `cypress_analyze_spec` on related specs to learn conventions
+3. **Write the feature code** — implement the UI change
+4. **Write the E2E test** — create a spec that validates the feature
+5. **Run** — `cypress_run_spec` against the new spec
+6. **Debug** — if failing: `cypress_get_failure_context` → fix → `cypress_rerun_last`
+7. **Regression** — run related/adjacent specs to ensure nothing broke
+8. **Commit** — only after all tests pass
 
-## Response Format
+**Rule: if the test passes, the feature works. If it fails, fix the code, not the test** (unless the test itself has a bug).
 
-All tools return a consistent envelope:
+## Phase 5: Regression Testing
 
+After any code change that touches shared components, run the full suite:
+```
+cypress_list_specs           → get all specs
+cypress_run_spec spec=...    → run each relevant spec
+```
+
+Or run the specific spec that covers the changed area:
+```
+cypress_discover             → find which spec covers the changed feature
+cypress_run_spec             → run just that spec
+```
+
+## Response Envelope
+
+All tools return a consistent format:
 ```json
 {
   "ok": true,
@@ -113,12 +166,47 @@ All tools return a consistent envelope:
 }
 ```
 
-Always check `ok` and follow `nextActions` for the recommended next step.
+- **Always check `ok`** — `false` means the tool itself had an error (not just test failures)
+- **Always follow `nextActions`** — the server recommends the optimal next step
+- **`runId`** tracks state across tool calls — `cypress_rerun_last` and `cypress_get_failure_context` reference the last run
 
-## Best Practices
+## Rules
 
-- **One spec per feature area** — login.cy.ts, dashboard.cy.ts, etc.
-- **Use data-cy selectors** — `cy.get('[data-cy="submit"]')` not `cy.get('.btn-primary')`
-- **Name tests clearly** — `"should show error when password is invalid"` not `"test 2"`
-- **Run before committing** — always verify tests pass via `cypress_run_spec`
-- **Use discovery first** — don't guess what tests exist, ask `cypress_discover`
+1. **Never guess why a test fails** — always call `cypress_get_failure_context`
+2. **Never copy terminal output manually** — the MCP tools return structured JSON
+3. **Never skip discovery** before writing new tests
+4. **Never commit tests that haven't passed** through `cypress_run_spec`
+5. **Never hardcode waits** — use Cypress's built-in retry/assertion mechanism
+6. **Never use CSS selectors** — use `data-cy`, `data-test`, or `data-testid` attributes
+7. **Fix the code, not the test** — unless the test itself is wrong
+
+## Common Patterns
+
+### Login flow
+```typescript
+cy.visit("/login");
+cy.get('[data-cy="email"]').type("user@example.com");
+cy.get('[data-cy="password"]').type("password123");
+cy.get('[data-cy="submit"]').click();
+cy.url().should("include", "/dashboard");
+```
+
+### API intercept
+```typescript
+cy.intercept("GET", "/api/users", { fixture: "users.json" }).as("getUsers");
+cy.visit("/users");
+cy.wait("@getUsers");
+cy.get('[data-cy="user-list"]').should("have.length.gt", 0);
+```
+
+### Form validation
+```typescript
+cy.get('[data-cy="submit"]').click();
+cy.get('[data-cy="email-error"]').should("contain", "Email is required");
+```
+
+### File upload
+```typescript
+cy.get('[data-cy="file-input"]').selectFile("cypress/fixtures/document.pdf");
+cy.get('[data-cy="upload-success"]').should("be.visible");
+```
