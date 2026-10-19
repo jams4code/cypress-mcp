@@ -1,4 +1,5 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -19,7 +20,8 @@ export function register(server: McpServer, ctx: ToolContext): void {
     "Comprehensive health check of the Cypress project. Validates config file, binary, spec files, support file, and directories. Use this to diagnose setup issues.",
     {},
     async () => {
-      const checks: { check: string; status: "ok" | "warn" | "fail"; detail: string }[] = [];
+      const checks: { check: string; status: "ok" | "warn" | "fail"; detail: string }[] =
+        [];
 
       // 1. Config file
       try {
@@ -35,9 +37,10 @@ export function register(server: McpServer, ctx: ToolContext): void {
         checks.push({
           check: "Spec files",
           status: specs.length > 0 ? "ok" : "warn",
-          detail: specs.length > 0
-            ? `${specs.length} spec files found`
-            : `No spec files found matching ${config.specPattern.join(", ")}`,
+          detail:
+            specs.length > 0
+              ? `${specs.length} spec files found`
+              : `No spec files found matching ${config.specPattern.join(", ")}`,
         });
 
         // 3. Support file
@@ -63,7 +66,9 @@ export function register(server: McpServer, ctx: ToolContext): void {
             checks.push({ check: "Support file", status: "ok", detail: sf });
             supportFound = true;
             break;
-          } catch { /* try next */ }
+          } catch {
+            /* try next */
+          }
         }
         if (!supportFound) {
           checks.push({
@@ -78,24 +83,21 @@ export function register(server: McpServer, ctx: ToolContext): void {
         try {
           const binary = await ctx.processManager.resolveBinary();
           resolvedBinary = binary;
-          const detail = binary.includes("npx")
-            ? "Using npx fallback"
-            : normalizePath(path.relative(config.projectRoot, binary));
           checks.push({
             check: "Cypress binary",
             status: "ok",
-            detail,
+            detail: normalizePath(path.relative(config.projectRoot, binary)),
           });
         } catch {
           checks.push({
             check: "Cypress binary",
             status: "fail",
-            detail: "Not found. Run: npm install cypress",
+            detail: "Not found. Run: npm install --save-dev cypress",
           });
         }
 
         // 5. Config runtime validation
-        if (resolvedBinary && !resolvedBinary.includes("npx")) {
+        if (resolvedBinary) {
           try {
             const validation = await ctx.processManager.run({
               spec: "__cypress_mcp_config_check__.cy.ts",
@@ -124,7 +126,7 @@ export function register(server: McpServer, ctx: ToolContext): void {
           checks.push({
             check: "Config runtime",
             status: "warn",
-            detail: "Skipped because Cypress is being resolved through npx fallback.",
+            detail: "Skipped because the Cypress binary was not found.",
           });
         }
 
@@ -137,7 +139,12 @@ export function register(server: McpServer, ctx: ToolContext): void {
             : "Not configured. Use cypress_run_spec or add @cypress/grep.",
         });
 
-        // 7. Screenshots dir
+        // 7. Cypress Cloud (optional)
+        checks.push(
+          cloudCheck(config.projectId, Boolean(process.env["CYPRESS_RECORD_KEY"])),
+        );
+
+        // 8. Screenshots dir
         const ssDir = path.join(config.projectRoot, config.screenshotsDir);
         try {
           await fs.access(ssDir);
@@ -154,7 +161,7 @@ export function register(server: McpServer, ctx: ToolContext): void {
           });
         }
 
-        // 8. Downloads dir
+        // 9. Downloads dir
         const dlDir = path.join(config.projectRoot, config.downloadsDir);
         try {
           await fs.access(dlDir);
@@ -210,4 +217,35 @@ export function register(server: McpServer, ctx: ToolContext): void {
       };
     },
   );
+}
+
+/** Cloud is optional, so a project without it is healthy. Exported for tests. */
+export function cloudCheck(
+  projectId: string | undefined,
+  hasRecordKey: boolean,
+): { check: string; status: "ok" | "warn"; detail: string } {
+  const check = "Cypress Cloud";
+  if (projectId && hasRecordKey) {
+    return { check, status: "ok", detail: `Ready to record (projectId ${projectId})` };
+  }
+  if (projectId) {
+    return {
+      check,
+      status: "warn",
+      detail: `projectId ${projectId} found, but CYPRESS_RECORD_KEY is not set in the server environment, so record: true will fail`,
+    };
+  }
+  if (hasRecordKey) {
+    return {
+      check,
+      status: "warn",
+      detail:
+        "CYPRESS_RECORD_KEY is set but no projectId was found in the Cypress config",
+    };
+  }
+  return {
+    check,
+    status: "ok",
+    detail: "Not configured (optional, only needed to record runs)",
+  };
 }

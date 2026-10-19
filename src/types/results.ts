@@ -1,4 +1,5 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 /** Normalized result from a Cypress test run */
 export interface CypressRunResult {
   readonly success: boolean;
@@ -10,6 +11,18 @@ export interface CypressRunResult {
   readonly error?: string;
   readonly stdoutTail?: string;
   readonly stderrTail?: string;
+  /** Present when the run was recorded to Cypress Cloud */
+  readonly cloud?: CloudRunInfo;
+}
+
+/**
+ * Where a recorded run lives in Cypress Cloud. `runUrl` is accepted as-is by
+ * Cypress Cloud MCP tools (cypress_get_runs, cypress_get_failed_tests, ...).
+ */
+export interface CloudRunInfo {
+  readonly runUrl: string;
+  readonly projectId?: string;
+  readonly runNumber?: number;
 }
 
 export interface RunStats {
@@ -18,6 +31,8 @@ export interface RunStats {
   readonly failing: number;
   readonly pending: number;
   readonly skipped: number;
+  /** Tests that passed only after one or more retries */
+  readonly flaky: number;
   readonly duration: number;
 }
 
@@ -28,6 +43,10 @@ export interface TestResult {
   readonly fullTitle: string;
   readonly state: TestState;
   readonly duration: number;
+  /** Attempts made, including retries (Cypress `retries` config) */
+  readonly attempts: number;
+  /** Passed after failing at least once: the same rule Cypress Cloud uses */
+  readonly flaky: boolean;
   readonly error?: TestError;
 }
 

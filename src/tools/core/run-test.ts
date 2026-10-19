@@ -1,83 +1,58 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../../types/index.js";
 import type { CypressRunArgs } from "../../types/cypress.js";
+import { TitleFilterUnavailableError } from "../../utils/errors.js";
 import {
-  CypressMcpError,
-  TitleFilterUnavailableError,
-} from "../../utils/errors.js";
-import {
-  buildRunNextActions,
-  buildRunSummary,
-  enrichRunResult,
-} from "../../utils/run-results.js";
+  cloudOptionsSchema,
+  executeRun,
+  runOptionsSchema,
+  toCloudArgs,
+  toolError,
+} from "./execute-run.js";
+
+const TOOL = "cypress_run_test";
 
 export function register(server: McpServer, ctx: ToolContext): void {
   server.tool(
-    "cypress_run_test",
-    "Run a specific test by name within a spec file using grep. Returns structured results with recommended next actions for the agent.",
+    TOOL,
+    "Run a specific test by name within a spec file using grep (@cypress/grep). Returns structured results with recommended next actions for the agent.",
     {
       spec: z.string().describe("Path to the spec file"),
-      testName: z.string().describe("Exact or partial test name to match"),
-      browser: z.string().optional().describe("Browser to use"),
-      timeout: z.number().optional().describe("Timeout in ms"),
+      testName: z.string().min(1).describe("Exact or partial test name to match"),
+      ...runOptionsSchema,
+      ...cloudOptionsSchema,
     },
-    async ({ spec, testName, browser, timeout }) => {
+    async ({ spec, testName, browser, headed, timeout, env, ...cloud }) => {
       try {
-        await ctx.specFinder.resolveSpec(spec);
+        const resolvedSpec = await ctx.specFinder.resolveSpec(spec);
         const config = await ctx.configLoader.load();
         if (!config.titleFilterSupport) {
           throw new TitleFilterUnavailableError();
         }
 
         const args: CypressRunArgs = {
-          spec,
+          spec: resolvedSpec,
           browser: browser ?? config.defaultBrowser,
+          headed,
           timeout: timeout ?? config.defaultTimeout,
+          env,
           grep: testName,
           configFile: config.cypressConfigFile,
+          cloud: toCloudArgs(cloud),
         };
 
-        const raw = await ctx.processManager.run(args);
-        const result = ctx.outputParser.parse(raw.stdout, raw.stderr, raw.exitCode);
-
-        const screenshots = await ctx.screenshotResolver.find(spec, testName);
-        const enriched = enrichRunResult(
-          result,
-          screenshots.length > 0 ? screenshots : result.screenshots,
-        );
-
-        const record = ctx.stateStore.recordRun(
-          "run_test", spec, args, enriched, raw.stdout, raw.stderr,
-        );
-
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({
-                ok: !enriched.error,
-                tool: "cypress_run_test",
-                runId: record.runId,
-                summary: buildRunSummary(enriched, spec, testName),
-                data: enriched,
-                nextActions: buildRunNextActions(enriched),
-              }, null, 2),
-            },
-          ],
-        };
+        return await executeRun(ctx, {
+          tool: TOOL,
+          kind: "run_test",
+          spec: resolvedSpec,
+          args,
+          testName,
+        });
       } catch (err) {
-        if (err instanceof CypressMcpError) {
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify({
-              ok: false, tool: "cypress_run_test", summary: err.message,
-              data: err.toJSON(), nextActions: ["cypress_doctor"],
-            }) }],
-            isError: true,
-          };
-        }
-        throw err;
+        return toolError(TOOL, err);
       }
     },
   );

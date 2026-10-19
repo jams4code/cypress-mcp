@@ -1,4 +1,5 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 export class CypressMcpError extends Error {
   constructor(
     message: string,
@@ -26,7 +27,7 @@ export class CypressNotFoundError extends CypressMcpError {
     super(
       `Cypress binary not found in ${projectRoot}`,
       "CYPRESS_NOT_FOUND",
-      "Run 'npm install cypress' or 'npx cypress install' in your project.",
+      "Install Cypress in the project with 'npm install --save-dev cypress', then run cypress_doctor.",
     );
     this.name = "CypressNotFoundError";
   }
@@ -69,14 +70,32 @@ export class TimeoutError extends CypressMcpError {
   }
 }
 
-export class ProcessBusyError extends CypressMcpError {
+export class InvalidArgumentError extends CypressMcpError {
+  constructor(message: string) {
+    super(message, "INVALID_ARGUMENT", "Fix the argument and call the tool again.");
+    this.name = "InvalidArgumentError";
+  }
+}
+
+export class SpecOutsideProjectError extends CypressMcpError {
+  constructor(spec: string) {
+    super(
+      `Spec path is outside the project root: ${spec}`,
+      "SPEC_OUTSIDE_PROJECT",
+      "Pass a spec path relative to the project root. Use cypress_list_specs to see available specs.",
+    );
+    this.name = "SpecOutsideProjectError";
+  }
+}
+
+export class RecordKeyMissingError extends CypressMcpError {
   constructor() {
     super(
-      "A Cypress process is already running",
-      "PROCESS_BUSY",
-      "Wait for the current run to finish, or use a longer timeout.",
+      "Recording to Cypress Cloud requires CYPRESS_RECORD_KEY in the cypress-mcp server environment.",
+      "RECORD_KEY_MISSING",
+      "Set CYPRESS_RECORD_KEY in the env block of your MCP client config for cypress-mcp. The key is never passed as a tool argument.",
     );
-    this.name = "ProcessBusyError";
+    this.name = "RecordKeyMissingError";
   }
 }
 

@@ -1,13 +1,7 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
-export type {
-  CypressMcpConfig,
-  RawServerConfig,
-} from "./config.js";
-export {
-  DEFAULT_CONFIG,
-  CYPRESS_CONFIG_FILES,
-  SERVER_CONFIG_FILE,
-} from "./config.js";
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
+export type { CypressMcpConfig, RawServerConfig } from "./config.js";
+export { DEFAULT_CONFIG, CYPRESS_CONFIG_FILES, SERVER_CONFIG_FILE } from "./config.js";
 
 export type {
   MochaJsonReport,
@@ -15,10 +9,12 @@ export type {
   MochaTest,
   MochaError,
   CypressRunArgs,
+  CloudRecordArgs,
 } from "./cypress.js";
 
 export type {
   CypressRunResult,
+  CloudRunInfo,
   RunStats,
   TestState,
   TestResult,
@@ -31,7 +27,6 @@ export type {
 } from "./results.js";
 
 // Service context passed to all tool handlers
-import type { CypressMcpConfig as Config } from "./config.js";
 import type { ProcessManager } from "../services/process-manager.js";
 import type { OutputParser } from "../services/output-parser.js";
 import type { ConfigLoader } from "../services/config-loader.js";
@@ -41,7 +36,6 @@ import type { StateStore } from "../services/state-store.js";
 import type { Logger } from "../utils/logger.js";
 
 export interface ToolContext {
-  readonly config: Config;
   readonly processManager: ProcessManager;
   readonly outputParser: OutputParser;
   readonly configLoader: ConfigLoader;

@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { OutputParser } from "../../src/services/output-parser.js";
+import { OutputParser, extractCloudRun } from "../../src/services/output-parser.js";
 import { createLogger } from "../../src/utils/logger.js";
 import passingFixture from "../fixtures/reporter-output/passing.json";
 import failingFixture from "../fixtures/reporter-output/failing.json";
 import mixedFixture from "../fixtures/reporter-output/mixed.json";
+import flakyFixture from "../fixtures/reporter-output/flaky.json";
 
 const parser = new OutputParser(createLogger(false));
 
@@ -93,5 +94,67 @@ ${JSON.stringify(passingFixture)}
     expect(result.error).toContain("ERR_MODULE_NOT_FOUND");
     expect(result.error).not.toContain("Output: DevTools listening");
     expect(result.stdoutTail).toBeDefined();
+  });
+
+  it("should flag tests that passed only after a retry as flaky", () => {
+    const result = parser.parse(JSON.stringify(flakyFixture), "", 0);
+
+    expect(result.success).toBe(true);
+    expect(result.stats.flaky).toBe(1);
+    const flaky = result.tests.find((t) => t.flaky);
+    expect(flaky?.title).toBe("shows live flight status");
+    expect(flaky?.attempts).toBe(3);
+    expect(result.tests.find((t) => !t.flaky)?.attempts).toBe(1);
+  });
+
+  it("should never mark a failed test as flaky", () => {
+    const result = parser.parse(JSON.stringify(failingFixture), "", 1);
+
+    expect(result.stats.flaky).toBe(0);
+    expect(result.tests.every((t) => !t.flaky)).toBe(true);
+  });
+
+  it("should find the report after unrelated braces in the output", () => {
+    const stdout = [
+      "Browser console: { theme: 'dark' }",
+      "  (Run Starting)",
+      JSON.stringify(passingFixture, null, 2),
+      "  (Run Finished)",
+    ].join("\n");
+
+    const result = parser.parse(stdout, "", 0);
+
+    expect(result.error).toBeUndefined();
+    expect(result.stats.passing).toBe(2);
+  });
+
+  it("should attach the Cypress Cloud run URL of a recorded run", () => {
+    const stdout = [
+      JSON.stringify(passingFixture),
+      "\u001b[32m  Recorded Run: https://cloud.cypress.io/projects/abc123/runs/42\u001b[39m",
+    ].join("\n");
+
+    const result = parser.parse(stdout, "", 0);
+
+    expect(result.cloud).toEqual({
+      runUrl: "https://cloud.cypress.io/projects/abc123/runs/42",
+      projectId: "abc123",
+      runNumber: 42,
+    });
+  });
+
+  it("should keep the Cloud run URL even when the run crashed", () => {
+    const stdout =
+      "  Run URL: https://cloud.cypress.io/projects/abc123/runs/43\nError: boom";
+
+    const result = parser.parse(stdout, "", 1);
+
+    expect(result.error).toBeDefined();
+    expect(result.cloud?.runNumber).toBe(43);
+  });
+
+  it("should not report Cloud info for local runs", () => {
+    expect(parser.parse(JSON.stringify(passingFixture), "", 0).cloud).toBeUndefined();
+    expect(extractCloudRun("no cloud here")).toBeUndefined();
   });
 });

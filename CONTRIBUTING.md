@@ -40,7 +40,7 @@ npm test             # Run tests
 
 - Keep PRs focused on a single change
 - Include tests for new functionality
-- Run `npm run typecheck && npm test` before submitting
+- Run `npm run typecheck && npm run lint && npm run format:check && npm test` before submitting
 - Write clear commit messages using conventional commits (`feat:`, `fix:`, `test:`, `docs:`)
 
 ## Code Style
@@ -52,4 +52,4 @@ npm test             # Run tests
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the same BSL 1.1 license as the project.
+By contributing, you agree that your contributions will be licensed under the Apache License 2.0, the same license as the project.

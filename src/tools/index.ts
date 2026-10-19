@@ -1,8 +1,13 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../types/index.js";
 
 // Core loop: discover -> run -> inspect -> fix -> rerun
+//
+// Tool names must never collide with Cypress Cloud MCP's (cypress_get_runs,
+// cypress_get_specs, cypress_get_tests, ...): agents often load both servers.
+// test/unit/cloud-compat.test.ts enforces this.
 import { register as discover } from "./discovery/discover.js";
 import { register as analyzeSpec } from "./discovery/analyze-spec.js";
 import { register as listSpecs } from "./core/list-specs.js";
@@ -14,6 +19,7 @@ import { register as getFailureContext } from "./debug/get-failure-context.js";
 import { register as getScreenshot } from "./debug/get-screenshot.js";
 
 // Environment and setup
+import { register as getConfig } from "./core/get-config.js";
 import { register as getEnv } from "./setup/get-env.js";
 import { register as doctor } from "./project/doctor.js";
 
@@ -34,6 +40,7 @@ export function registerAllTools(server: McpServer, ctx: ToolContext): void {
   getScreenshot(server, ctx);
 
   // Setup
+  getConfig(server, ctx);
   getEnv(server, ctx);
   doctor(server, ctx);
 }

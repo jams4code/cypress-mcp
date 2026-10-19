@@ -107,4 +107,28 @@ describe("ConfigLoader", () => {
       await fs.rm(tempRoot, { recursive: true, force: true });
     }
   });
+
+  it("should read the Cypress Cloud projectId from the Cypress config", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cypress-mcp-config-"));
+    const previous = process.env["CYPRESS_PROJECT_ID"];
+    delete process.env["CYPRESS_PROJECT_ID"];
+
+    try {
+      await fs.writeFile(
+        path.join(tempRoot, "cypress.config.ts"),
+        "export default { projectId: 'abc123', e2e: {} };\n",
+      );
+
+      const config = await new ConfigLoader(tempRoot, logger).load();
+      expect(config.projectId).toBe("abc123");
+
+      process.env["CYPRESS_PROJECT_ID"] = "fromenv";
+      const fromEnv = await new ConfigLoader(tempRoot, logger).load();
+      expect(fromEnv.projectId).toBe("fromenv");
+    } finally {
+      if (previous === undefined) delete process.env["CYPRESS_PROJECT_ID"];
+      else process.env["CYPRESS_PROJECT_ID"] = previous;
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
 });

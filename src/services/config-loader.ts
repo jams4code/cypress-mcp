@@ -1,4 +1,5 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -45,14 +46,19 @@ export class ConfigLoader {
         configHints.downloadsDir ??
         DEFAULT_CONFIG.downloadsDir,
       specPattern: normalizePatterns(
-        serverConfig?.specPattern ?? configHints.specPattern ?? DEFAULT_CONFIG.specPattern,
+        serverConfig?.specPattern ??
+          configHints.specPattern ??
+          DEFAULT_CONFIG.specPattern,
       ),
       supportFile: serverConfig?.supportFile ?? configHints.supportFile,
       titleFilterSupport:
         serverConfig?.titleFilterSupport ??
         (await this.detectTitleFilterSupport(configFile, configHints.supportFile)),
-      authCommand: serverConfig?.authCommand,
-      authTokenPath: serverConfig?.authTokenPath,
+      // Same precedence as Cypress itself: env var over config file
+      projectId:
+        serverConfig?.projectId ??
+        nonEmpty(process.env["CYPRESS_PROJECT_ID"]) ??
+        configHints.projectId,
     };
 
     this.logger.info("Config loaded", {
@@ -146,7 +152,11 @@ export class ConfigLoader {
     let mergedHints = extractConfigHints(content);
 
     for (const importedFile of resolveRelativeImports(absolute, content)) {
-      const importedHints = await this.loadConfigHintsFromFile(importedFile, visited, depth + 1);
+      const importedHints = await this.loadConfigHintsFromFile(
+        importedFile,
+        visited,
+        depth + 1,
+      );
       mergedHints = mergeConfigHints(mergedHints, importedHints);
     }
 
@@ -196,6 +206,7 @@ export class ConfigLoader {
 }
 
 interface ConfigHints {
+  readonly projectId?: string;
   readonly specPattern?: readonly string[];
   readonly supportFile?: string | false;
   readonly screenshotsDir?: string;
@@ -210,8 +221,13 @@ function normalizePatterns(value: string | readonly string[]): string[] {
   return patterns.map((pattern) => normalizePath(pattern));
 }
 
+function nonEmpty(value: string | undefined): string | undefined {
+  return value && value.trim() !== "" ? value.trim() : undefined;
+}
+
 function extractConfigHints(content: string): ConfigHints {
   return {
+    projectId: extractSingleString(content, "projectId"),
     specPattern: extractStringList(content, "specPattern"),
     supportFile: extractSupportFile(content),
     screenshotsDir:
@@ -304,6 +320,7 @@ function resolveImportPath(baseDir: string, importPath: string): string | null {
 
 function mergeConfigHints(primary: ConfigHints, fallback: ConfigHints): ConfigHints {
   return {
+    projectId: primary.projectId ?? fallback.projectId,
     specPattern: primary.specPattern ?? fallback.specPattern,
     supportFile: primary.supportFile ?? fallback.supportFile,
     screenshotsDir: primary.screenshotsDir ?? fallback.screenshotsDir,

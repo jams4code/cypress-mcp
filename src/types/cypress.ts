@@ -1,4 +1,5 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 /** Raw Mocha JSON reporter output from Cypress */
 export interface MochaJsonReport {
   readonly stats: MochaStats;
@@ -22,8 +23,10 @@ export interface MochaStats {
 export interface MochaTest {
   readonly title: string;
   readonly fullTitle: string;
-  readonly duration: number;
-  readonly currentRetry: number;
+  /** Absent for pending tests */
+  readonly duration?: number;
+  /** Zero-based retry index of the final attempt */
+  readonly currentRetry?: number;
   readonly speed?: "slow" | "medium" | "fast";
   readonly err: MochaError;
 }
@@ -45,4 +48,17 @@ export interface CypressRunArgs {
   readonly env?: Readonly<Record<string, string>>;
   readonly grep?: string;
   readonly configFile?: string;
+  readonly cloud?: CloudRecordArgs;
+}
+
+/**
+ * Options for recording a run to Cypress Cloud. The record key is never part
+ * of these args: Cypress reads it from CYPRESS_RECORD_KEY in the server's
+ * environment, so it never passes through the agent.
+ */
+export interface CloudRecordArgs {
+  readonly record: boolean;
+  readonly tags?: readonly string[];
+  readonly group?: string;
+  readonly ciBuildId?: string;
 }

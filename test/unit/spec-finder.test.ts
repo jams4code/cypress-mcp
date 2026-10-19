@@ -26,6 +26,27 @@ describe("SpecFinder", () => {
     );
   });
 
+  it("should return the spec path relative to the project root", async () => {
+    await expect(
+      finder.resolveSpec(path.join(fixtureRoot, "cypress/e2e/sample.cy.ts")),
+    ).resolves.toBe("cypress/e2e/sample.cy.ts");
+  });
+
+  it("should reject specs outside the project root", async () => {
+    await expect(finder.resolveSpec("../../../package.json")).rejects.toThrow(
+      "outside the project root",
+    );
+    await expect(finder.resolveSpec(path.resolve("package.json"))).rejects.toThrow(
+      "outside the project root",
+    );
+  });
+
+  it("should reject directories", async () => {
+    await expect(finder.resolveSpec("cypress/e2e")).rejects.toThrow(
+      "Spec file not found",
+    );
+  });
+
   it("should count tests in a spec file", async () => {
     const count = await finder.countTests("cypress/e2e/sample.cy.ts");
 

@@ -4,6 +4,6 @@
   "defaultTimeout": 300000,
   "screenshotsDir": "cypress/screenshots",
   "downloadsDir": "cypress/downloads",
-  "authCommand": "npm run authenticate",
-  "authTokenPath": ".tmp/tokens.json"
+  "titleFilterSupport": true,
+  "projectId": "abc123"
 }

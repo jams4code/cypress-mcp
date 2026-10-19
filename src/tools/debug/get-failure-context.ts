@@ -1,4 +1,5 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -46,7 +47,11 @@ export function register(server: McpServer, ctx: ToolContext): void {
                     stdoutTail: lastRun.stdoutTail || undefined,
                     stderrTail: lastRun.stderrTail || undefined,
                   },
-                  nextActions: ["cypress_doctor", "cypress_get_last_run", "cypress_rerun_last"],
+                  nextActions: [
+                    "cypress_doctor",
+                    "cypress_get_last_run",
+                    "cypress_rerun_last",
+                  ],
                 },
                 null,
                 2,
@@ -155,9 +160,7 @@ async function getSpecExcerpt(
   spec: string,
   errorMessage: string,
 ): Promise<string | undefined> {
-  const absolute = path.isAbsolute(spec)
-    ? spec
-    : path.join(projectRoot, spec);
+  const absolute = path.isAbsolute(spec) ? spec : path.join(projectRoot, spec);
 
   try {
     const content = await fs.readFile(absolute, "utf-8");
@@ -168,9 +171,7 @@ async function getSpecExcerpt(
     let bestLine = -1;
 
     for (const keyword of keywords) {
-      const idx = lines.findIndex((l) =>
-        l.toLowerCase().includes(keyword.toLowerCase()),
-      );
+      const idx = lines.findIndex((l) => l.toLowerCase().includes(keyword.toLowerCase()));
       if (idx !== -1) {
         bestLine = idx;
         break;

@@ -1,4 +1,5 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 export interface CypressMcpConfig {
   readonly projectRoot: string;
   readonly cypressConfigFile: string;
@@ -9,9 +10,8 @@ export interface CypressMcpConfig {
   readonly specPattern: readonly string[];
   readonly supportFile?: string | false;
   readonly titleFilterSupport: boolean;
-  readonly authCommand?: string;
-  readonly authTokenPath?: string;
-  readonly env?: Readonly<Record<string, string>>;
+  /** Cypress Cloud project id, needed to record runs and to query Cloud MCP */
+  readonly projectId?: string;
 }
 
 export interface RawServerConfig {
@@ -23,8 +23,7 @@ export interface RawServerConfig {
   specPattern?: string | readonly string[];
   supportFile?: string | false;
   titleFilterSupport?: boolean;
-  authCommand?: string;
-  authTokenPath?: string;
+  projectId?: string;
 }
 
 export const DEFAULT_CONFIG: Omit<CypressMcpConfig, "projectRoot" | "cypressConfigFile"> =
