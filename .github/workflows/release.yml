@@ -20,14 +20,30 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
+      - name: Check tag matches package version
+        run: test "$GITHUB_REF_NAME" = "v$(node -p 'require("./package.json").version')"
+
+      # Trusted publishing (OIDC) needs npm 11.5.1 or later. No token secret.
+      - run: npm install -g npm@^11.5.1
+
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
       - run: npm test
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # A version published by hand must not fail the release.
+      - name: Check if version is already on npm
+        id: npm
+        run: |
+          if npm view "cypress-mcp@${GITHUB_REF_NAME#v}" version > /dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.npm.outputs.published != 'true'
+        run: npm publish --provenance --access public
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

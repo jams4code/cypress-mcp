@@ -2,7 +2,7 @@
 
 **An MCP (Model Context Protocol) server that gives AI coding agents full control over Cypress test execution.**
 
-Run, debug, and iterate on Cypress E2E tests directly from Claude Code, Cursor, Windsurf, or any MCP-compatible AI agent — without switching to a terminal.
+Run, debug, and iterate on Cypress E2E tests directly from Claude Code, Cursor, Windsurf, or any MCP-compatible AI agent, without switching to a terminal.
 
 ---
 
@@ -111,7 +111,7 @@ All without the developer leaving their AI agent conversation.
 
 ### Transport
 
-**stdio** (standard input/output) — the simplest and most portable MCP transport. The AI agent spawns the server as a child process and communicates via JSON-RPC over stdin/stdout.
+**stdio** (standard input/output): the simplest and most portable MCP transport. The AI agent spawns the server as a child process and communicates via JSON-RPC over stdin/stdout.
 
 ### Process Management
 
@@ -275,24 +275,24 @@ Add to `.cursor/mcp.json` or VS Code MCP settings:
 
 ## Roadmap
 
-### v1.0 — Core
+### v1.0: Core
 - Run specs, get structured results
 - Screenshot access
 - Auth check/refresh
 - Project auto-detection
 
-### v1.1 — Enhanced Debugging
+### v1.1: Enhanced Debugging
 - Cypress Cloud integration (replay URLs)
 - DOM snapshot on failure (serialized HTML)
 - Network request log (intercepted API calls)
 - Console log capture
 
-### v1.2 — Interactive Mode
+### v1.2: Interactive Mode
 - Watch mode (re-run on file change)
 - Selective test re-run (only failed tests)
 - Component testing support
 
-### v2.0 — Multi-Project
+### v2.0: Multi-Project
 - Support multiple Cypress projects simultaneously
 - Cross-project test orchestration
 - Shared authentication across projects

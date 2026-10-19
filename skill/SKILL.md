@@ -1,6 +1,6 @@
 ---
 name: cypress-testing
-description: Complete guide for AI agents to do frontend E2E testing SDLC with cypress-mcp — discover, write, run, debug, iterate, and regression test Cypress specs without leaving the conversation.
+description: Complete guide for AI agents to do frontend E2E testing SDLC with cypress-mcp to discover, write, run, debug, iterate, and regression test Cypress specs without leaving the conversation.
 metadata:
   priority: 9
   pathPatterns:
@@ -38,7 +38,7 @@ metadata:
 
 ## Core Principle
 
-The product is the **discover → write → run → inspect → fix → rerun** loop. Every tool exists to make one step of that loop faster. `cypress_run_spec` is the source of truth — if the test passes, the feature works.
+The product is the **discover → write → run → inspect → fix → rerun** loop. Every tool exists to make one step of that loop faster. `cypress_run_spec` is the source of truth. If the test passes, the feature works.
 
 ## Quick Reference
 
@@ -68,17 +68,17 @@ Never skip discovery. Never guess what tests exist. The AI must understand the t
 ## Phase 2: Write Tests
 
 ### Before writing
-1. `cypress_discover` — see existing coverage, find gaps
-2. `cypress_analyze_spec` — study a similar spec to understand the project's conventions (page objects, selectors, helpers, hooks)
-3. Follow the existing patterns — don't invent new patterns unless the project has none
+1. `cypress_discover`: see existing coverage, find gaps
+2. `cypress_analyze_spec`: study a similar spec to understand the project's conventions (page objects, selectors, helpers, hooks)
+3. Follow the existing patterns. Don't invent new patterns unless the project has none
 
 ### Writing conventions
-- **One spec per feature area** — `login.cy.ts`, `checkout.cy.ts`, `dashboard.cy.ts`
-- **Use data attributes for selectors** — `cy.get('[data-cy="submit"]')` or `cy.get('[data-test="submit"]')`, never CSS classes
-- **Name tests clearly** — `"should show error when password is invalid"`, not `"test 2"`
-- **Describe blocks match feature areas** — `describe("Login Page", () => { ... })`
-- **Use beforeEach for common setup** — navigation, auth, test data
-- **Keep tests independent** — each test should work in isolation
+- **One spec per feature area**: `login.cy.ts`, `checkout.cy.ts`, `dashboard.cy.ts`
+- **Use data attributes for selectors**: `cy.get('[data-cy="submit"]')` or `cy.get('[data-test="submit"]')`, never CSS classes
+- **Name tests clearly**: `"should show error when password is invalid"`, not `"test 2"`
+- **Describe blocks match feature areas**: `describe("Login Page", () => { ... })`
+- **Use beforeEach for common setup**: navigation, auth, test data
+- **Keep tests independent**: each test should work in isolation
 
 ### Test structure
 ```typescript
@@ -116,7 +116,7 @@ cypress_rerun_last            → verify fix (zero friction, replays exact args)
 
 ### Key behaviors
 - **`cypress_get_failure_context`** is the most important debugging tool. One call returns: failing test title, error message, stack hint pointing to user code, spec excerpt around the failure, screenshot paths, and recommended next actions. Always use this instead of manually parsing run results.
-- **`cypress_rerun_last`** replays the exact previous `run_spec` or `run_test` invocation from state. Use it after every fix attempt — no need to remember spec paths or test names.
+- **`cypress_rerun_last`** replays the exact previous `run_spec` or `run_test` invocation from state. Use it after every fix attempt. No need to remember spec paths or test names.
 - **`cypress_get_screenshot`** returns absolute file paths. Multimodal agents should read the image file directly to see what the browser rendered at failure time.
 - **Flaky tests** show up as `flaky: true` in `data.tests` and in the summary ("(1 flaky)"). A flaky pass is not done: find the race (missing wait on an intercept, animation, unstable selector) and fix it, then rerun until it passes on the first attempt.
 - **Cypress Cloud**: when a run was recorded, `data.cloud.runUrl` is the Cloud run. If the Cypress Cloud MCP server is also connected, pass that URL to its `cypress_get_failed_tests` or `cypress_get_flaky_tests` for Test Replay and history across CI runs. Never ask the user for the record key in chat; it belongs in the server environment.
@@ -131,14 +131,14 @@ If `cypress_run_spec` returns `"Cypress failed to start"`:
 
 When implementing a new frontend feature end-to-end:
 
-1. **Discover** — `cypress_discover` to see current test coverage
-2. **Analyze** — `cypress_analyze_spec` on related specs to learn conventions
-3. **Write the feature code** — implement the UI change
-4. **Write the E2E test** — create a spec that validates the feature
-5. **Run** — `cypress_run_spec` against the new spec
-6. **Debug** — if failing: `cypress_get_failure_context` → fix → `cypress_rerun_last`
-7. **Regression** — run related/adjacent specs to ensure nothing broke
-8. **Commit** — only after all tests pass
+1. **Discover**: `cypress_discover` to see current test coverage
+2. **Analyze**: `cypress_analyze_spec` on related specs to learn conventions
+3. **Write the feature code**: implement the UI change
+4. **Write the E2E test**: create a spec that validates the feature
+5. **Run**: `cypress_run_spec` against the new spec
+6. **Debug**: when failing, `cypress_get_failure_context` → fix → `cypress_rerun_last`
+7. **Regression**: run related/adjacent specs to ensure nothing broke
+8. **Commit**: only after all tests pass
 
 **Rule: if the test passes, the feature works. If it fails, fix the code, not the test** (unless the test itself has a bug).
 
@@ -170,19 +170,19 @@ All tools return a consistent format:
 }
 ```
 
-- **Always check `ok`** — `false` means the tool itself had an error (not just test failures)
-- **Always follow `nextActions`** — the server recommends the optimal next step
-- **`runId`** tracks state across tool calls — `cypress_rerun_last` and `cypress_get_failure_context` reference the last run
+- **Always check `ok`**: `false` means the tool itself had an error (not just test failures)
+- **Always follow `nextActions`**: the server recommends the optimal next step
+- **`runId`** tracks state across tool calls. `cypress_rerun_last` and `cypress_get_failure_context` reference the last run
 
 ## Rules
 
-1. **Never guess why a test fails** — always call `cypress_get_failure_context`
-2. **Never copy terminal output manually** — the MCP tools return structured JSON
+1. **Never guess why a test fails**: always call `cypress_get_failure_context`
+2. **Never copy terminal output manually**: the MCP tools return structured JSON
 3. **Never skip discovery** before writing new tests
 4. **Never commit tests that haven't passed** through `cypress_run_spec`
-5. **Never hardcode waits** — use Cypress's built-in retry/assertion mechanism
-6. **Never use CSS selectors** — use `data-cy`, `data-test`, or `data-testid` attributes
-7. **Fix the code, not the test** — unless the test itself is wrong
+5. **Never hardcode waits**: use Cypress's built-in retry/assertion mechanism
+6. **Never use CSS selectors**: use `data-cy`, `data-test`, or `data-testid` attributes
+7. **Fix the code, not the test**: unless the test itself is wrong
 
 ## Common Patterns
 
