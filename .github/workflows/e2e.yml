@@ -1,0 +1,57 @@
+name: E2E
+
+# Drives a real Cypress project through the MCP protocol. Cypress 14 covers
+# the pre-15.10 CLI (no --expose); latest catches breaking Cypress releases.
+# The weekly run tests new Cypress versions even when nothing changed here.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cypress:
+    name: Cypress ${{ matrix.cypress }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, cypress: "14", grep: "4" }
+          - { os: ubuntu-latest, cypress: "latest", grep: "latest" }
+          - { os: windows-latest, cypress: "latest", grep: "latest" }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Install Cypress ${{ matrix.cypress }}
+        run: npm install --prefix test/e2e/project --no-save --no-package-lock --no-audit --no-fund cypress@${{ matrix.cypress }} @cypress/grep@${{ matrix.grep }}
+
+      - run: node test/e2e/smoke.mjs
+
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.os }}-cypress-${{ matrix.cypress }}
+          path: test/e2e/project/cypress/screenshots
+          if-no-files-found: ignore
