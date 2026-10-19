@@ -22,11 +22,11 @@ npm test             # Run tests
 
 ## Project Structure
 
-- `src/tools/` — One file per MCP tool, grouped by category
-- `src/services/` — Business logic (process manager, parser, config loader)
-- `src/utils/` — Shared utilities (logger, paths, errors, sanitize)
-- `src/types/` — TypeScript type definitions
-- `test/` — Unit and integration tests
+- `src/tools/`: One file per MCP tool, grouped by category
+- `src/services/`: Business logic (process manager, parser, config loader)
+- `src/utils/`: Shared utilities (logger, paths, errors, sanitize)
+- `src/types/`: TypeScript type definitions
+- `test/`: Unit and integration tests
 
 ## Adding a New Tool
 
@@ -49,6 +49,14 @@ npm test             # Run tests
 - No `any` types
 - Prettier for formatting
 - ESLint for linting
+
+## Releasing
+
+1. Bump `version` in `package.json` and add a `CHANGELOG.md` entry
+2. Merge to `main`, then push a matching tag: `git tag v0.3.0 && git push origin v0.3.0`
+3. The release workflow checks the tag matches the version, runs the full check, publishes to npm with provenance and creates the GitHub release
+
+Publishing uses npm trusted publishing (OIDC), so there is no npm token secret. The package's trusted publisher on npmjs.com must point at this repository and `release.yml`. If a version is already on npm, the workflow skips the publish and still creates the GitHub release.
 
 ## License
 
