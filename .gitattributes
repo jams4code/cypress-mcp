@@ -1,0 +1,3 @@
+# Check out LF on every platform so Prettier and the Windows CI agree
+* text=auto eol=lf
+*.png binary

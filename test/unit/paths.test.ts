@@ -37,7 +37,9 @@ describe("resolveCypressInstall", () => {
   let tmp: string;
 
   beforeAll(async () => {
-    tmp = await fs.mkdtemp(path.join(os.tmpdir(), "cypress-mcp-cli-"));
+    // realpath: on macOS the temp dir is behind a symlink (/var -> /private/var)
+    // and Node's module resolution returns the real path.
+    tmp = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "cypress-mcp-cli-")));
     // A hoisted install: cypress lives in the parent of the project
     const pkgDir = path.join(tmp, "node_modules", "cypress");
     await fs.mkdir(path.join(pkgDir, "bin"), { recursive: true });
