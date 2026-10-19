@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/jams4code/cypress-mcp/security/advisories/new
+    about: Report privately. Do not open a public issue.
+  - name: Consulting and support
+    url: https://www.jadev-corp.com/
+    about: Help integrating cypress-mcp or scaling your QA team.

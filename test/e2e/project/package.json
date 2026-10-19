@@ -1,0 +1,6 @@
+{
+  "name": "cypress-mcp-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Real Cypress project driven through cypress-mcp in CI. Cypress and @cypress/grep are installed by the workflow so each version can be tested."
+}

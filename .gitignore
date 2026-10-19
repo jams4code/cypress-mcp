@@ -26,3 +26,7 @@ coverage/
 
 # Package
 *.tgz
+
+# E2E project artifacts
+test/e2e/project/cypress/screenshots/
+test/e2e/project/cypress/videos/
