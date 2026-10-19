@@ -14,6 +14,7 @@ const baseResult: CypressRunResult = {
     failing: 1,
     pending: 0,
     skipped: 0,
+    flaky: 0,
     duration: 1000,
   },
   tests: [],
@@ -41,7 +42,11 @@ describe("run-results helpers", () => {
 
   it("should summarize pre-test crashes clearly", () => {
     const summary = buildRunSummary(
-      { ...baseResult, error: "Config invalid", stats: { ...baseResult.stats, tests: 0, failing: 0 } },
+      {
+        ...baseResult,
+        error: "Config invalid",
+        stats: { ...baseResult.stats, tests: 0, failing: 0 },
+      },
       "e2e/login.cy.ts",
     );
 
@@ -55,5 +60,35 @@ describe("run-results helpers", () => {
     });
 
     expect(nextActions).toEqual(["cypress_doctor", "cypress_get_last_run"]);
+  });
+
+  it("should mention flaky tests in the summary", () => {
+    const summary = buildRunSummary(
+      {
+        ...baseResult,
+        success: true,
+        failures: [],
+        stats: { ...baseResult.stats, passing: 3, failing: 0, flaky: 1 },
+      },
+      "e2e/login.cy.ts",
+    );
+
+    expect(summary).toBe("All 3 tests passed in e2e/login.cy.ts (1 flaky)");
+  });
+
+  it("should point recorded failures at Cypress Cloud MCP", () => {
+    const runUrl = "https://cloud.cypress.io/projects/abc123/runs/42";
+    const nextActions = buildRunNextActions({ ...baseResult, cloud: { runUrl } });
+
+    expect(nextActions[0]).toBe("cypress_get_failure_context");
+    expect(
+      nextActions.some(
+        (a) => a.includes("cypress_get_failed_tests") && a.includes(runUrl),
+      ),
+    ).toBe(true);
+  });
+
+  it("should not mention Cloud MCP for local runs", () => {
+    expect(buildRunNextActions(baseResult).join(" ")).not.toContain("Cloud");
   });
 });

@@ -1,4 +1,5 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 const DIAGNOSTIC_PATTERN =
   /(your configfile is invalid|configfile is invalid|error \[err_|cannot find module|cannot find|syntaxerror|referenceerror|typeerror|exception|failed)/i;
 
@@ -55,8 +56,7 @@ export function classifyConfigRuntimeCheck(
   };
 }
 
-const NOISE_PATTERN =
-  /^(DevTools listening|Opening [`']\/dev\/tty|tput:|={3,}|\s*$)/;
+const NOISE_PATTERN = /^(DevTools listening|Opening [`']\/dev\/tty|tput:|={3,}|\s*$)/;
 
 function findDiagnosticWindow(output: string): string | null {
   const lines = output

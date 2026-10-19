@@ -1,4 +1,6 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
+import path from "node:path";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./server.js";
 import { ConfigLoader } from "./services/config-loader.js";
@@ -7,6 +9,7 @@ import { OutputParser } from "./services/output-parser.js";
 import { SpecFinder } from "./services/spec-finder.js";
 import { ScreenshotResolver } from "./services/screenshot-resolver.js";
 import { StateStore } from "./services/state-store.js";
+import { DEFAULT_CONFIG } from "./types/config.js";
 import { createLogger } from "./utils/logger.js";
 import type { ToolContext } from "./types/index.js";
 
@@ -19,37 +22,30 @@ export async function main(argv: string[]): Promise<void> {
 
   const configLoader = new ConfigLoader(cwd, logger);
 
-  // Load config eagerly to fail fast on misconfiguration
-  let config;
+  // Load eagerly so misconfiguration shows up in the logs right away.
+  // A missing config is not fatal: tools load it again on every call.
   try {
-    config = await configLoader.load();
+    await configLoader.load();
   } catch (err) {
-    // Config not found is OK - tools will report it when called
     logger.warn("Could not load config at startup, tools will retry on demand", {
       error: err instanceof Error ? err.message : String(err),
     });
-    // Create a minimal config for service initialization
-    config = {
-      projectRoot: cwd,
-      cypressConfigFile: "",
-      defaultBrowser: "electron",
-      defaultTimeout: 300_000,
-      screenshotsDir: "cypress/screenshots",
-      downloadsDir: "cypress/downloads",
-      specPattern: ["cypress/e2e/**/*.cy.{ts,js,tsx,jsx}"],
-      titleFilterSupport: false,
-    };
   }
 
   const ctx: ToolContext = {
-    config,
-    processManager: new ProcessManager(config.projectRoot, logger),
+    processManager: new ProcessManager(cwd, logger),
     outputParser: new OutputParser(logger),
     configLoader,
-    specFinder: new SpecFinder(config.projectRoot, logger),
+    specFinder: new SpecFinder(cwd, logger),
     screenshotResolver: new ScreenshotResolver(
-      config.projectRoot,
-      config.screenshotsDir,
+      cwd,
+      async () => {
+        try {
+          return (await configLoader.load()).screenshotsDir;
+        } catch {
+          return DEFAULT_CONFIG.screenshotsDir;
+        }
+      },
       logger,
     ),
     stateStore: new StateStore(),
@@ -58,25 +54,33 @@ export async function main(argv: string[]): Promise<void> {
 
   const server = createServer(ctx);
   const transport = new StdioServerTransport();
-  await server.connect(transport);
 
-  logger.info("Server connected, waiting for requests");
+  // The client closing stdin is the normal way an MCP session ends. Kill any
+  // running Cypress so it cannot outlive the session, then let Node exit on
+  // its own once pending responses are flushed.
+  const onDisconnect = (): void => {
+    logger.info("Client disconnected");
+    void ctx.processManager.abort();
+  };
+  transport.onclose = onDisconnect;
+  process.stdin.on("end", onDisconnect);
 
-  // Graceful shutdown
-  const shutdown = (): void => {
-    logger.info("Shutting down");
-    ctx.processManager.abort();
+  const onSignal = async (signal: string): Promise<void> => {
+    logger.info("Shutting down", { signal });
+    await ctx.processManager.abort();
     process.exit(0);
   };
+  process.on("SIGINT", () => void onSignal("SIGINT"));
+  process.on("SIGTERM", () => void onSignal("SIGTERM"));
 
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
+  await server.connect(transport);
+  logger.info("Server connected, waiting for requests");
 }
 
 function parseCwd(argv: string[]): string {
   const cwdIndex = argv.indexOf("--cwd");
   const cwdValue = cwdIndex !== -1 ? argv[cwdIndex + 1] : undefined;
-  return cwdValue ?? process.cwd();
+  return path.resolve(cwdValue ?? process.cwd());
 }
 
 // Auto-start when run directly

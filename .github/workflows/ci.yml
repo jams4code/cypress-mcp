@@ -6,13 +6,17 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [18, 20, 22]
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@v4
 
@@ -23,5 +27,20 @@ jobs:
 
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
       - run: npm run build
       - run: npm test
+
+      - name: Check published package contents
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: |
+          npm pack --dry-run --json > pack.json
+          for f in bin/cypress-mcp.mjs dist/index.js LICENSE NOTICE README.md package.json; do
+            node -e "const p=require('./pack.json')[0].files.map(f=>f.path); if(!p.includes(process.argv[1])){console.error('missing from package: '+process.argv[1]);process.exit(1)}" "$f"
+          done
+
+      - name: Audit production dependencies
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        run: npm audit --omit=dev --audit-level=moderate

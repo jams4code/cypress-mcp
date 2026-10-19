@@ -1,4 +1,5 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 import { glob } from "tinyglobby";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -6,15 +7,19 @@ import { normalizePath } from "../utils/paths.js";
 import type { Logger } from "../utils/logger.js";
 
 export class ScreenshotResolver {
+  /**
+   * @param getScreenshotsDir Read on every call so a config created or fixed
+   * after startup is picked up without restarting the server.
+   */
   constructor(
     private readonly projectRoot: string,
-    private readonly screenshotsDir: string,
+    private readonly getScreenshotsDir: () => Promise<string>,
     private readonly logger: Logger,
   ) {}
 
   /** Find screenshots matching a spec name or test name */
   async find(spec?: string, testName?: string): Promise<string[]> {
-    const dir = path.join(this.projectRoot, this.screenshotsDir);
+    const dir = path.join(this.projectRoot, await this.getScreenshotsDir());
 
     try {
       await fs.access(dir);
@@ -38,7 +43,10 @@ export class ScreenshotResolver {
     if (testName) {
       const sanitized = testName.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
       filtered = filtered.filter((f) => {
-        const fileName = path.basename(f).replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        const fileName = path
+          .basename(f)
+          .replace(/[^a-zA-Z0-9]/g, "")
+          .toLowerCase();
         return fileName.includes(sanitized);
       });
     }

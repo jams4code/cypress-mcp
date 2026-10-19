@@ -1,4 +1,5 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 const SENSITIVE_KEYS = new Set([
   "password",
   "secret",
@@ -31,7 +32,8 @@ export function sanitizeEnv(
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(env)) {
     if (isSensitiveKey(key) && typeof value === "string") {
-      result[key] = value.length > 4 ? value.slice(0, 2) + "***" + value.slice(-2) : "***";
+      result[key] =
+        value.length > 4 ? value.slice(0, 2) + "***" + value.slice(-2) : "***";
     } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
       result[key] = sanitizeEnv(value as Record<string, unknown>);
     } else {

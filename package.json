@@ -1,7 +1,7 @@
 {
   "name": "cypress-mcp",
-  "version": "0.1.1",
-  "description": "MCP server for AI-driven Cypress test execution. Run, debug, and iterate on E2E tests directly from your AI agent.",
+  "version": "0.2.0",
+  "description": "MCP server for AI-driven Cypress test execution. Run, debug, and iterate on E2E tests from your AI agent, with Cypress Cloud recording and flaky test detection.",
   "type": "module",
   "bin": {
     "cypress-mcp": "./bin/cypress-mcp.mjs"
@@ -12,12 +12,13 @@
     "dist",
     "bin",
     "LICENSE",
+    "NOTICE",
     "README.md"
   ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "lint": "eslint src/ test/",
     "lint:fix": "eslint src/ test/ --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -36,10 +37,12 @@
     "ai-tools",
     "test-automation",
     "claude",
-    "cursor"
+    "cursor",
+    "cypress-cloud",
+    "flaky-tests"
   ],
   "author": "JADEV GROUP SARL <info@jadev-group.com> (https://jadev-group.com)",
-  "license": "BUSL-1.1",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jams4code/cypress-mcp.git"
@@ -49,23 +52,23 @@
   },
   "homepage": "https://github.com/jams4code/cypress-mcp#readme",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.12.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0",
-    "tinyglobby": "^0.2.11",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "tinyglobby": "^0.2.17",
     "tree-kill": "^1.2.2",
     "zod": "^3.24.0"
   },
   "devDependencies": {
-    "@types/node": "^22.15.0",
-    "@typescript-eslint/eslint-plugin": "^8.57.2",
-    "@typescript-eslint/parser": "^8.57.2",
-    "eslint": "^9.26.0",
-    "prettier": "^3.5.0",
+    "@types/node": "^22.20.5",
+    "@typescript-eslint/eslint-plugin": "^8.71.2",
+    "@typescript-eslint/parser": "^8.71.2",
+    "eslint": "^9.39.5",
+    "prettier": "^3.9.10",
     "tsup": "^8.5.0",
     "typescript": "^5.8.0",
-    "vitest": "^3.1.0"
+    "vitest": "^5.0.5"
   },
   "peerDependencies": {
     "cypress": ">=12.0.0"

@@ -1,10 +1,12 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../../types/index.js";
 import type { DescribeBlock, SpecAnalysis } from "../../types/results.js";
+import { CypressMcpError } from "../../utils/errors.js";
 
 export function register(server: McpServer, ctx: ToolContext): void {
   server.tool(
@@ -14,28 +16,30 @@ export function register(server: McpServer, ctx: ToolContext): void {
       spec: z.string().describe("Path to the spec file to analyze"),
     },
     async ({ spec }) => {
-      const config = await ctx.configLoader.load();
-      const absolute = path.isAbsolute(spec)
-        ? spec
-        : path.join(config.projectRoot, spec);
-
       try {
-        const content = await fs.readFile(absolute, "utf-8");
-        const analysis = analyzeSpec(spec, content);
+        const resolvedSpec = await ctx.specFinder.resolveSpec(spec);
+        const config = await ctx.configLoader.load();
+        const content = await fs.readFile(
+          path.join(config.projectRoot, resolvedSpec),
+          "utf-8",
+        );
+        const analysis = analyzeSpec(resolvedSpec, content);
 
         return {
-          content: [
-            { type: "text" as const, text: JSON.stringify(analysis, null, 2) },
-          ],
+          content: [{ type: "text" as const, text: JSON.stringify(analysis, null, 2) }],
         };
-      } catch {
+      } catch (err) {
         return {
           content: [
             {
               type: "text" as const,
               text: JSON.stringify({
-                error: `Could not read spec file: ${spec}`,
-                suggestion: "Check the file path. Use cypress_list_specs to see available specs.",
+                error:
+                  err instanceof CypressMcpError
+                    ? err.message
+                    : `Could not read spec file: ${spec}`,
+                suggestion:
+                  "Check the file path. Use cypress_list_specs to see available specs.",
               }),
             },
           ],
@@ -135,19 +139,74 @@ function extractCustomCommands(content: string): string[] {
 
   // Standard Cypress commands to exclude
   const builtins = new Set([
-    "get", "find", "contains", "click", "type", "visit", "intercept",
-    "request", "wait", "fixture", "wrap", "should", "then", "and",
-    "its", "invoke", "within", "as", "trigger", "select", "check",
-    "uncheck", "clear", "submit", "focus", "blur", "scrollTo",
-    "scrollIntoView", "dblclick", "rightclick", "hover", "reload",
-    "go", "back", "forward", "viewport", "window", "document",
-    "title", "url", "hash", "location", "readFile", "writeFile",
-    "task", "log", "pause", "debug", "screenshot", "clock",
-    "tick", "stub", "spy", "mount", "on", "once", "off",
-    "getCookie", "getCookies", "setCookie", "clearCookie", "clearCookies",
-    "getAllLocalStorage", "clearAllLocalStorage",
-    "getAllSessionStorage", "clearAllSessionStorage",
-    "session", "origin",
+    "get",
+    "find",
+    "contains",
+    "click",
+    "type",
+    "visit",
+    "intercept",
+    "request",
+    "wait",
+    "fixture",
+    "wrap",
+    "should",
+    "then",
+    "and",
+    "its",
+    "invoke",
+    "within",
+    "as",
+    "trigger",
+    "select",
+    "check",
+    "uncheck",
+    "clear",
+    "submit",
+    "focus",
+    "blur",
+    "scrollTo",
+    "scrollIntoView",
+    "dblclick",
+    "rightclick",
+    "hover",
+    "reload",
+    "go",
+    "back",
+    "forward",
+    "viewport",
+    "window",
+    "document",
+    "title",
+    "url",
+    "hash",
+    "location",
+    "readFile",
+    "writeFile",
+    "task",
+    "log",
+    "pause",
+    "debug",
+    "screenshot",
+    "clock",
+    "tick",
+    "stub",
+    "spy",
+    "mount",
+    "on",
+    "once",
+    "off",
+    "getCookie",
+    "getCookies",
+    "setCookie",
+    "clearCookie",
+    "clearCookies",
+    "getAllLocalStorage",
+    "clearAllLocalStorage",
+    "getAllSessionStorage",
+    "clearAllSessionStorage",
+    "session",
+    "origin",
   ]);
 
   let match: RegExpExecArray | null;

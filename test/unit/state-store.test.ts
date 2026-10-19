@@ -5,7 +5,15 @@ import type { CypressRunArgs } from "../../src/types/cypress.js";
 
 const mockResult: CypressRunResult = {
   success: true,
-  stats: { tests: 2, passing: 2, failing: 0, pending: 0, skipped: 0, duration: 5000 },
+  stats: {
+    tests: 2,
+    passing: 2,
+    failing: 0,
+    pending: 0,
+    skipped: 0,
+    flaky: 0,
+    duration: 5000,
+  },
   tests: [],
   failures: [],
   screenshots: ["/path/to/screenshot.png"],
@@ -23,7 +31,12 @@ describe("StateStore", () => {
   it("should record and retrieve a run with full metadata", () => {
     const store = new StateStore();
     const record = store.recordRun(
-      "run_spec", "spec.cy.ts", mockArgs, mockResult, "stdout", "stderr",
+      "run_spec",
+      "spec.cy.ts",
+      mockArgs,
+      mockResult,
+      "stdout",
+      "stderr",
     );
 
     expect(record.runId).toMatch(/^run_/);

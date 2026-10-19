@@ -1,9 +1,10 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 import { glob } from "tinyglobby";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { normalizePath } from "../utils/paths.js";
-import { SpecNotFoundError } from "../utils/errors.js";
+import { normalizePath, resolveInsideRoot } from "../utils/paths.js";
+import { SpecNotFoundError, SpecOutsideProjectError } from "../utils/errors.js";
 import type { Logger } from "../utils/logger.js";
 
 export class SpecFinder {
@@ -29,18 +30,26 @@ export class SpecFinder {
     return sorted;
   }
 
-  /** Verify a spec file exists and return its absolute path */
+  /**
+   * Verify a spec file exists inside the project and return its path relative
+   * to the project root, with forward slashes. Rejects paths that escape the root.
+   */
   async resolveSpec(spec: string): Promise<string> {
-    const absolute = path.isAbsolute(spec)
-      ? spec
-      : path.join(this.projectRoot, spec);
+    const absolute = resolveInsideRoot(this.projectRoot, spec);
+    if (!absolute) {
+      throw new SpecOutsideProjectError(spec);
+    }
 
     try {
-      await fs.access(absolute);
-      return normalizePath(absolute);
+      const stat = await fs.stat(absolute);
+      if (!stat.isFile()) {
+        throw new SpecNotFoundError(spec);
+      }
     } catch {
       throw new SpecNotFoundError(spec);
     }
+
+    return normalizePath(path.relative(path.resolve(this.projectRoot), absolute));
   }
 
   /** Count tests in a spec file using regex (no AST parsing) */

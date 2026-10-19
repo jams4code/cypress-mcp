@@ -1,4 +1,5 @@
-// Copyright (c) 2026 JADEV GROUP SARL. Licensed under BUSL-1.1.
+// Copyright (c) 2026 JADEV GROUP SARL
+// SPDX-License-Identifier: Apache-2.0
 import path from "node:path";
 import type { CypressRunResult, FailureDetail } from "../types/results.js";
 
@@ -26,24 +27,49 @@ export function buildRunSummary(
       : `Cypress failed before tests executed in ${spec}`;
   }
 
+  const flaky = result.stats.flaky > 0 ? ` (${result.stats.flaky} flaky)` : "";
+
   if (testName) {
     if (result.stats.tests === 0) {
       return `No tests matched "${testName}" in ${spec}`;
     }
 
     return result.success
-      ? `Test "${testName}" passed in ${spec}`
+      ? `Test "${testName}" passed in ${spec}${flaky}`
       : `Test "${testName}" failed in ${spec}`;
   }
 
   if (result.success) {
-    return `All ${result.stats.passing} tests passed in ${spec}`;
+    return `All ${result.stats.passing} tests passed in ${spec}${flaky}`;
   }
 
-  return `${result.stats.failing} failing, ${result.stats.passing} passing in ${spec}`;
+  return `${result.stats.failing} failing, ${result.stats.passing} passing in ${spec}${flaky}`;
 }
 
 export function buildRunNextActions(
+  result: CypressRunResult,
+  options?: { includeDiscoverOnSuccess?: boolean },
+): string[] {
+  const actions = localNextActions(result, options);
+
+  // A recorded run is also queryable through Cypress Cloud MCP, which adds
+  // Test Replay and history across runs. Point the agent there by run URL.
+  const runUrl = result.cloud?.runUrl;
+  if (runUrl) {
+    if (result.stats.failing > 0) {
+      actions.push(
+        `Cypress Cloud MCP: cypress_get_failed_tests for ${runUrl} (Test Replay links)`,
+      );
+    }
+    if (result.stats.flaky > 0) {
+      actions.push(`Cypress Cloud MCP: cypress_get_flaky_tests for ${runUrl}`);
+    }
+  }
+
+  return actions;
+}
+
+function localNextActions(
   result: CypressRunResult,
   options?: { includeDiscoverOnSuccess?: boolean },
 ): string[] {
@@ -53,6 +79,13 @@ export function buildRunNextActions(
 
   if (result.stats.failing > 0) {
     return ["cypress_get_failure_context", "cypress_get_screenshot"];
+  }
+
+  if (result.stats.flaky > 0) {
+    return [
+      "Stabilize the flaky test(s): data.tests entries with flaky: true",
+      "cypress_rerun_last",
+    ];
   }
 
   if (options?.includeDiscoverOnSuccess && result.stats.passing > 0) {

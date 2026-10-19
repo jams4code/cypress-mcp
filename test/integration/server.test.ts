@@ -1,9 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { spawn } from "node:child_process";
 import path from "node:path";
+import { readFileSync } from "node:fs";
 
 const SERVER_PATH = path.resolve("dist/index.js");
 const FIXTURE_PATH = path.resolve("test/fixtures/cypress-project");
+const PACKAGE_VERSION = (
+  JSON.parse(readFileSync(path.resolve("package.json"), "utf-8")) as { version: string }
+).version;
 
 const EXPECTED_TOOLS = [
   "cypress_discover",
@@ -15,13 +19,12 @@ const EXPECTED_TOOLS = [
   "cypress_get_last_run",
   "cypress_get_failure_context",
   "cypress_get_screenshot",
+  "cypress_get_config",
   "cypress_get_env",
   "cypress_doctor",
 ] as const;
 
-function sendJsonRpc(
-  messages: object[],
-): Promise<{ stdout: string; stderr: string }> {
+function sendJsonRpc(messages: object[]): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn("node", [SERVER_PATH, "--cwd", FIXTURE_PATH], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -69,11 +72,11 @@ describe("Server Integration", () => {
     const response = JSON.parse(lines[0]!);
 
     expect(response.result.serverInfo.name).toBe("cypress-mcp");
-    expect(response.result.serverInfo.version).toBe("0.1.0");
+    expect(response.result.serverInfo.version).toBe(PACKAGE_VERSION);
     expect(response.result.capabilities.tools).toBeDefined();
   });
 
-  it("should register exactly 11 tools", async () => {
+  it("should register every expected tool", async () => {
     const { stdout } = await sendJsonRpc([
       {
         jsonrpc: "2.0",
@@ -94,9 +97,7 @@ describe("Server Integration", () => {
     expect(toolsResponse).toBeDefined();
 
     const parsed = JSON.parse(toolsResponse!);
-    const toolNames = parsed.result.tools.map(
-      (t: { name: string }) => t.name,
-    );
+    const toolNames = parsed.result.tools.map((t: { name: string }) => t.name);
 
     expect(toolNames).toHaveLength(EXPECTED_TOOLS.length);
     for (const expected of EXPECTED_TOOLS) {

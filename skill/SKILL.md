@@ -53,6 +53,8 @@ The product is the **discover → write → run → inspect → fix → rerun** 
 | After fixing code | `cypress_rerun_last` (replays exact last command) |
 | Check full results | `cypress_get_last_run` |
 | Check env config | `cypress_get_env` |
+| Check config or Cloud setup | `cypress_get_config` |
+| Share a run in Cypress Cloud | `cypress_run_spec` with `record: true`, then Cloud MCP tools on `data.cloud.runUrl` |
 
 ## Phase 1: Start Every Session
 
@@ -116,6 +118,8 @@ cypress_rerun_last            → verify fix (zero friction, replays exact args)
 - **`cypress_get_failure_context`** is the most important debugging tool. One call returns: failing test title, error message, stack hint pointing to user code, spec excerpt around the failure, screenshot paths, and recommended next actions. Always use this instead of manually parsing run results.
 - **`cypress_rerun_last`** replays the exact previous `run_spec` or `run_test` invocation from state. Use it after every fix attempt — no need to remember spec paths or test names.
 - **`cypress_get_screenshot`** returns absolute file paths. Multimodal agents should read the image file directly to see what the browser rendered at failure time.
+- **Flaky tests** show up as `flaky: true` in `data.tests` and in the summary ("(1 flaky)"). A flaky pass is not done: find the race (missing wait on an intercept, animation, unstable selector) and fix it, then rerun until it passes on the first attempt.
+- **Cypress Cloud**: when a run was recorded, `data.cloud.runUrl` is the Cloud run. If the Cypress Cloud MCP server is also connected, pass that URL to its `cypress_get_failed_tests` or `cypress_get_flaky_tests` for Test Replay and history across CI runs. Never ask the user for the record key in chat; it belongs in the server environment.
 
 ### When Cypress can't start
 If `cypress_run_spec` returns `"Cypress failed to start"`:
