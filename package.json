@@ -62,13 +62,13 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
-    "@typescript-eslint/eslint-plugin": "^8.71.2",
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
     "@typescript-eslint/parser": "^8.71.2",
     "eslint": "^9.39.5",
     "prettier": "^3.9.10",
     "tsup": "^8.5.0",
     "typescript": "^5.8.0",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "peerDependencies": {
     "cypress": ">=12.0.0"
