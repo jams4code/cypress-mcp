@@ -7,6 +7,10 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     labels: [dependencies]
+    ignore:
+      # Types must match the lowest supported Node (engines: >=22.12).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "fix(deps)"
       prefix-development: "chore(deps)"
