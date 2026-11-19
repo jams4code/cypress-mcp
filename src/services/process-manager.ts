@@ -66,6 +66,11 @@ export function abortAllRuns(): Promise<void> {
 
 /** Grace period between SIGTERM and SIGKILL when stopping Cypress. */
 const FORCE_KILL_AFTER_MS = 5_000;
+/**
+ * After a killed Cypress exits, how long to wait for its output to close. A
+ * helper that left the process tree can hold the pipes open for minutes.
+ */
+const PIPE_CLOSE_AFTER_EXIT_MS = 2_000;
 const CYPRESS_INFO_TIMEOUT_MS = 60_000;
 
 /** A browser name, optionally with a channel: chrome, chrome:beta, firefox:dev. */
@@ -265,6 +270,7 @@ export class ProcessManager {
       let cancelled = false;
       let killing = false;
       let forceKillTimer: NodeJS.Timeout | null = null;
+      let pipeCloseTimer: NodeJS.Timeout | null = null;
       let settled = false;
 
       // Run the CLI script with the current Node binary. No shell is involved
@@ -325,6 +331,9 @@ export class ProcessManager {
         if (forceKillTimer) {
           clearTimeout(forceKillTimer);
         }
+        if (pipeCloseTimer) {
+          clearTimeout(pipeCloseTimer);
+        }
         if (this.activeProcess === child) {
           this.activeProcess = null;
         }
@@ -368,6 +377,25 @@ export class ProcessManager {
       };
 
       child.on("close", (exitCode) => finish(() => settle(exitCode)));
+      // "close" waits for every process holding stdout and stderr. When we
+      // killed Cypress, a helper that escaped the tree kill (reparented, or
+      // started during shutdown) would block the queue until it ends.
+      child.on("exit", (exitCode) => {
+        if (!killing || settled) {
+          return;
+        }
+        pipeCloseTimer = setTimeout(() => {
+          this.logger.warn(
+            "Cypress exited but a helper still holds its output; closing it",
+            {
+              pid: child.pid,
+            },
+          );
+          child.stdout.destroy();
+          child.stderr.destroy();
+          finish(() => settle(exitCode));
+        }, PIPE_CLOSE_AFTER_EXIT_MS);
+      });
       child.on("error", (err) => finish(() => settle(null, err)));
     });
   }

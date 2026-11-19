@@ -20,6 +20,7 @@ Everything needed to fix a failing test in one call: the page at the failure, wi
 - `component: true` runs component tests (`cypress run --component`); the wrapper also wraps the `component` config.
 - Monorepos: when the server root has no `cypress.config.*`, the project is found from the spec path, from `project`, or alone when there is one. Paths in results stay relative to the server root. `cypress_list_specs` lists every project's specs, `cypress_doctor` takes `project`.
 - One Cypress at a time for the whole server, across projects.
+- A cancelled or timed out run frees the queue within seconds of Cypress exiting, even when a helper process that left the tree still holds its output open (seen with Cypress 14 on Linux).
 
 ### Screenshots and reporters
 

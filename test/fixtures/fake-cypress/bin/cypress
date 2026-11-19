@@ -142,6 +142,28 @@ for (const [index, spec] of specs.entries()) {
     continue;
   }
 
+  if (name === "escape.cy.js") {
+    // A helper that left the process tree (its parent exited, so a tree kill
+    // cannot find it) but still holds this process's stdout and stderr.
+    const middle = spawn(
+      process.execPath,
+      [
+        "-e",
+        `const c = require("node:child_process").spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { detached: true, stdio: ["ignore", "inherit", "inherit"] });
+require("node:fs").writeFileSync(process.argv[1], JSON.stringify([c.pid]));
+c.unref();`,
+        process.env.FAKE_CYPRESS_PIDS,
+      ],
+      { stdio: ["ignore", "inherit", "inherit"] },
+    );
+    middle.on("exit", () => {
+      emit({ event: "start", total: 1, spec });
+      emit({ event: "test", title: "never ends", fullTitle: "Escape never ends" });
+    });
+    setInterval(() => {}, 1000);
+    return;
+  }
+
   if (name === "hang.cy.js") {
     // Like the Cypress binary, a child that keeps running if only this
     // process is killed.

@@ -414,6 +414,34 @@ describe("progress, cancellation and timeouts (B2)", () => {
     expect(Date.now() - started).toBeLessThan(10_000);
   }, 30_000);
 
+  it("frees the queue when a helper outside the tree keeps the output open", async () => {
+    fs.rmSync(pidFile, { force: true });
+    const escapeSpec = path.join(root, "cypress", "e2e", "escape.cy.js");
+    fs.writeFileSync(escapeSpec, 'it("never ends", () => cy.wait(600000));\n');
+    const controller = new AbortController();
+    const cancelled = call(
+      "cypress_run",
+      { spec: "cypress/e2e/escape.cy.js" },
+      {
+        signal: controller.signal,
+        onprogress: () => controller.abort("user cancelled"),
+      },
+    );
+    await expect(cancelled).rejects.toThrow(/cancelled/);
+    expect(await waitFor(() => fs.existsSync(pidFile), 5_000)).toBe(true);
+    const [escaped] = JSON.parse(fs.readFileSync(pidFile, "utf-8")) as number[];
+
+    try {
+      const started = Date.now();
+      const next = await call("cypress_run", { spec: "cypress/e2e/pass.cy.js" });
+      expect(next.structured.data["status"]).toBe("passed");
+      expect(Date.now() - started).toBeLessThan(15_000);
+    } finally {
+      if (escaped && alive(escaped)) process.kill(escaped, "SIGKILL");
+      fs.rmSync(escapeSpec, { force: true });
+    }
+  }, 30_000);
+
   it("keeps the partial run and names the test that hung on timeout", async () => {
     const { isError, text, structured } = await call("cypress_run", {
       spec: "cypress/e2e/hang.cy.js",
