@@ -5,6 +5,12 @@ on:
     tags:
       - 'v*'
 
+# Nothing by default; each job asks for what it needs.
+permissions: {}
+
+# Actions are pinned to commit SHAs because these jobs hold id-token: write.
+# Dependabot updates the SHA and the version comment together.
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -12,16 +18,20 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
           cache: npm
 
-      - name: Check tag matches package version
-        run: test "$GITHUB_REF_NAME" = "v$(node -p 'require("./package.json").version')"
+      - name: Check tag matches package and server.json versions
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          test "$GITHUB_REF_NAME" = "v$version"
+          test "$(node -p 'require("./server.json").version')" = "$version"
+          test "$(node -p 'require("./server.json").packages[0].version')" = "$version"
 
       # Trusted publishing (OIDC) needs npm 11.5.1 or later. No token secret.
       - run: npm install -g npm@^11.5.1
@@ -46,6 +56,60 @@ jobs:
         run: npm publish --provenance --access public
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           generate_release_notes: true
+
+  # Lists the server in the official MCP Registry (registry.modelcontextprotocol.io).
+  # Runs after the npm publish: the registry checks that the npm package exists
+  # and that its package.json mcpName matches server.json. Login uses the
+  # workflow's GitHub OIDC token, which grants the io.github.jams4code namespace.
+  mcp-registry:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # Raise deliberately; the binary is verified against this tag's Sigstore bundle.
+      MCP_PUBLISHER_VERSION: v1.8.9
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Like the npm step: a version already in the registry must not fail the release.
+      - name: Check if version is already in the MCP Registry
+        id: registry
+        run: |
+          name="$(jq -r .name server.json | sed 's#/#%2F#')"
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            "https://registry.modelcontextprotocol.io/v0.1/servers/${name}/versions/${GITHUB_REF_NAME#v}")"
+          if [ "$status" = "200" ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.registry.outputs.published != 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Download and verify mcp-publisher
+        if: steps.registry.outputs.published != 'true'
+        run: |
+          set -euo pipefail
+          archive="mcp-publisher_linux_amd64.tar.gz"
+          base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
+          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          cosign verify-blob \
+            --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$archive"
+          tar xzf "$archive" mcp-publisher
+          rm -f "$archive" "$archive.sigstore.json"
+
+      - name: Publish to the MCP Registry
+        if: steps.registry.outputs.published != 'true'
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

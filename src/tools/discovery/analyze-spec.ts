@@ -3,59 +3,106 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { ToolContext } from "../../types/index.js";
 import type { DescribeBlock, SpecAnalysis } from "../../types/results.js";
-import { CypressMcpError } from "../../utils/errors.js";
+import { parseSpec, type ParsedSuite } from "../../services/spec-parser.js";
+import { finish } from "../../format/compact.js";
+import { READ_ONLY, envelopeSchema, errorResult, textResult } from "../result.js";
+
+const TOOL = "cypress_analyze_spec";
+
+const analysisDataSchema = z.object({
+  file: z.string(),
+  structure: z.object({
+    describes: z
+      .array(z.looseObject({ name: z.string() }))
+      .describe("Suites with tests (name, line, mode), hooks and nested suites"),
+  }),
+  visits: z.array(z.string()),
+  intercepts: z.array(z.string()),
+  fixtures: z.array(z.string()),
+  customCommands: z.array(z.string()),
+});
 
 export function register(server: McpServer, ctx: ToolContext): void {
-  server.tool(
-    "cypress_analyze_spec",
-    "Deep analysis of a single spec file. Extracts describe/it blocks with line numbers, cy.visit URLs, cy.intercept routes, fixtures used, and custom commands called.",
+  server.registerTool(
+    TOOL,
     {
-      spec: z.string().describe("Path to the spec file to analyze"),
+      title: "Analyze a Cypress spec",
+      description:
+        "Outline of one spec file, read statically: describe/it blocks with line numbers and hooks, cy.visit URLs, cy.intercept routes, fixtures and custom commands.",
+      inputSchema: z.object({
+        spec: z.string().describe("Path to the spec file to analyze"),
+      }),
+      outputSchema: envelopeSchema(analysisDataSchema),
+      annotations: READ_ONLY,
     },
     async ({ spec }) => {
       try {
         const resolvedSpec = await ctx.specFinder.resolveSpec(spec);
-        const config = await ctx.configLoader.load();
         const content = await fs.readFile(
-          path.join(config.projectRoot, resolvedSpec),
+          path.join(ctx.projectRoot, resolvedSpec),
           "utf-8",
         );
         const analysis = analyzeSpec(resolvedSpec, content);
+        const testCount = countTests(analysis.structure.describes);
+        const summary = `${resolvedSpec}: ${testCount} test(s)`;
 
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(analysis, null, 2) }],
-        };
+        return textResult(finish([summary, ...outline(analysis)], []), {
+          ok: true,
+          tool: TOOL,
+          summary,
+          data: analysis,
+          nextActions: [],
+        });
       } catch (err) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({
-                error:
-                  err instanceof CypressMcpError
-                    ? err.message
-                    : `Could not read spec file: ${spec}`,
-                suggestion:
-                  "Check the file path. Use cypress_list_specs to see available specs.",
-              }),
-            },
-          ],
-          isError: true,
-        };
+        return errorResult(TOOL, err, ctx.logger);
       }
     },
   );
 }
 
-function analyzeSpec(file: string, content: string): SpecAnalysis {
-  const lines = content.split("\n");
+function countTests(blocks: readonly DescribeBlock[]): number {
+  return blocks.reduce(
+    (sum, block) => sum + block.tests.length + countTests(block.nested),
+    0,
+  );
+}
 
+/** Indented describe/it tree with line numbers, then the lists. */
+function outline(analysis: SpecAnalysis): string[] {
+  const lines: string[] = [];
+  const walk = (block: DescribeBlock, depth: number): void => {
+    const pad = "  ".repeat(depth);
+    const mode = block.mode ? `.${block.mode}` : "";
+    const hooks = block.hooks.length > 0 ? ` hooks: ${block.hooks.join(", ")}` : "";
+    lines.push(
+      `${pad}${block.line ? `${block.line}: ` : ""}describe${mode} ${JSON.stringify(block.name)}${hooks}`,
+    );
+    for (const test of block.tests) {
+      lines.push(
+        `${pad}  ${test.line}: it${test.mode ? `.${test.mode}` : ""} ${JSON.stringify(test.name)}`,
+      );
+    }
+    for (const nested of block.nested) walk(nested, depth + 1);
+  };
+  for (const block of analysis.structure.describes) walk(block, 0);
+
+  const list = (label: string, values: readonly string[]): void => {
+    if (values.length > 0) lines.push(`${label}: ${values.join(", ")}`);
+  };
+  list("visits", analysis.visits);
+  list("intercepts", analysis.intercepts);
+  list("fixtures", analysis.fixtures);
+  list("custom commands", analysis.customCommands);
+  return lines;
+}
+
+function analyzeSpec(file: string, content: string): SpecAnalysis {
   return {
     file,
-    structure: { describes: extractDescribeBlocks(lines) },
+    structure: { describes: toDescribeBlocks(parseSpec(content).root) },
     visits: extractPatterns(content, /cy\.visit\s*\(\s*['"`](.+?)['"`]/g),
     intercepts: extractInterceptPatterns(content),
     fixtures: extractPatterns(content, /cy\.fixture\s*\(\s*['"`](.+?)['"`]/g),
@@ -63,50 +110,28 @@ function analyzeSpec(file: string, content: string): SpecAnalysis {
   };
 }
 
-function extractDescribeBlocks(lines: string[]): DescribeBlock[] {
-  const blocks: DescribeBlock[] = [];
-  const describeRegex = /describe\s*\(\s*['"`](.+?)['"`]/;
-  const itRegex = /it(?:\.only|\.skip)?\s*\(\s*['"`](.+?)['"`]/;
-  const hookRegex = /\b(before|beforeEach|after|afterEach)\s*\(/;
-
-  let currentDescribe: DescribeBlock | null = null;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
-    const descMatch = describeRegex.exec(line);
-    const itMatch = itRegex.exec(line);
-    const hookMatch = hookRegex.exec(line);
-
-    if (descMatch?.[1]) {
-      currentDescribe = {
-        name: descMatch[1],
-        tests: [],
-        hooks: [],
-        nested: [],
-      };
-      blocks.push(currentDescribe);
-    } else if (itMatch?.[1] && currentDescribe) {
-      (currentDescribe.tests as { name: string; line: number }[]).push({
-        name: itMatch[1],
-        line: i + 1,
-      });
-    } else if (itMatch?.[1] && !currentDescribe) {
-      if (blocks.length === 0) {
-        currentDescribe = { name: "(root)", tests: [], hooks: [], nested: [] };
-        blocks.push(currentDescribe);
-      }
-      (blocks[0]!.tests as { name: string; line: number }[]).push({
-        name: itMatch[1],
-        line: i + 1,
-      });
-    } else if (hookMatch?.[1] && currentDescribe) {
-      if (!(currentDescribe.hooks as string[]).includes(hookMatch[1])) {
-        (currentDescribe.hooks as string[]).push(hookMatch[1]);
-      }
-    }
+/** Top-level suites, preceded by a "(root)" block for tests and hooks outside any describe. */
+function toDescribeBlocks(root: ParsedSuite): DescribeBlock[] {
+  const blocks = root.suites.map(toDescribeBlock);
+  if (root.tests.length > 0 || root.hooks.length > 0) {
+    blocks.unshift({ ...toDescribeBlock(root), name: "(root)", nested: [] });
   }
-
   return blocks;
+}
+
+function toDescribeBlock(suite: ParsedSuite): DescribeBlock {
+  return {
+    name: suite.name,
+    ...(suite.line > 0 ? { line: suite.line } : {}),
+    ...(suite.mode ? { mode: suite.mode } : {}),
+    tests: suite.tests.map((test) => ({
+      name: test.name,
+      line: test.line,
+      ...(test.mode ? { mode: test.mode } : {}),
+    })),
+    hooks: [...suite.hooks],
+    nested: suite.suites.map(toDescribeBlock),
+  };
 }
 
 function extractPatterns(content: string, regex: RegExp): string[] {

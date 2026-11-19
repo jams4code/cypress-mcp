@@ -4,7 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import {
   isVersionAtLeast,
+  parseCwdArg,
   resolveCypressInstall,
+  resolveProjectRoot,
   resolveInsideRoot,
 } from "../../src/utils/paths.js";
 
@@ -86,5 +88,31 @@ describe("isVersionAtLeast", () => {
 
   it("treats an unreadable version as old", () => {
     expect(isVersionAtLeast("next", 15, 10)).toBe(false);
+  });
+});
+
+describe("parseCwdArg", () => {
+  it("reads --cwd <dir> and --cwd=<dir>", () => {
+    expect(parseCwdArg(["--cwd", "/work/shop", "--verbose"])).toBe("/work/shop");
+    expect(parseCwdArg(["--cwd=/work/my shop"])).toBe("/work/my shop");
+  });
+
+  it("returns undefined when --cwd is absent", () => {
+    expect(parseCwdArg(["--verbose"])).toBeUndefined();
+  });
+});
+
+describe("resolveProjectRoot", () => {
+  const start = path.resolve("start-dir");
+  const claude = path.resolve("claude-project");
+  const flag = path.resolve("from-flag");
+
+  it("prefers --cwd, then CLAUDE_PROJECT_DIR, then the start directory", () => {
+    expect(
+      resolveProjectRoot(["--cwd", flag], { CLAUDE_PROJECT_DIR: claude }, start),
+    ).toBe(flag);
+    expect(resolveProjectRoot([], { CLAUDE_PROJECT_DIR: claude }, start)).toBe(claude);
+    expect(resolveProjectRoot([], { CLAUDE_PROJECT_DIR: " " }, start)).toBe(start);
+    expect(resolveProjectRoot([], {}, start)).toBe(start);
   });
 });

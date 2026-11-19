@@ -4,6 +4,7 @@ import { glob } from "tinyglobby";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { normalizePath, resolveInsideRoot } from "../utils/paths.js";
+import { parseSpec, type ParsedSpec } from "./spec-parser.js";
 import {
   InvalidArgumentError,
   SpecNotFoundError,
@@ -79,19 +80,21 @@ export class SpecFinder {
     return normalizePath(path.relative(path.resolve(this.projectRoot), absolute));
   }
 
-  /** Count tests in a spec file using regex (no AST parsing) */
-  async countTests(specPath: string): Promise<number> {
+  /** Parse the describe/it structure of a spec, or null when it cannot be read. */
+  async parse(specPath: string): Promise<ParsedSpec | null> {
     const absolute = path.isAbsolute(specPath)
       ? specPath
       : path.join(this.projectRoot, specPath);
 
     try {
-      const content = await fs.readFile(absolute, "utf-8");
-      const itMatches = content.match(/\bit\s*\(/g);
-      const itDotMatches = content.match(/\bit\.(only|skip)\s*\(/g);
-      return (itMatches?.length ?? 0) + (itDotMatches?.length ?? 0);
+      return parseSpec(await fs.readFile(absolute, "utf-8"));
     } catch {
-      return 0;
+      return null;
     }
+  }
+
+  /** Count the tests declared in a spec, with the same parser as discovery. */
+  async countTests(specPath: string): Promise<number> {
+    return (await this.parse(specPath))?.tests.length ?? 0;
   }
 }

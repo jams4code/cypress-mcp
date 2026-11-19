@@ -1,7 +1,8 @@
 {
   "name": "cypress-mcp",
-  "version": "0.2.1",
-  "description": "MCP server for AI-driven Cypress test execution. Run, debug, and iterate on E2E tests from your AI agent, with Cypress Cloud recording and flaky test detection.",
+  "version": "0.4.0",
+  "description": "MCP server and CLI that let AI coding agents run and debug Cypress tests: compact failures with file:line, error and screenshot, flaky test detection, Cypress Cloud recording.",
+  "mcpName": "io.github.jams4code/cypress-mcp",
   "type": "module",
   "bin": {
     "cypress-mcp": "bin/cypress-mcp.mjs"
@@ -9,20 +10,25 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist",
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/THIRD_PARTY_NOTICES.md",
     "bin",
+    "reporter",
+    "runtime",
+    "skill",
     "LICENSE",
     "NOTICE",
     "README.md"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node scripts/third-party-notices.mjs",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
-    "lint": "eslint src/ test/",
-    "lint:fix": "eslint src/ test/ --fix",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
+    "lint": "eslint src/ test/ reporter/ runtime/",
+    "lint:fix": "eslint src/ test/ reporter/ runtime/ --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"reporter/**/*.cjs\" \"runtime/**/*.{js,cjs}\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"reporter/**/*.cjs\" \"runtime/**/*.{js,cjs}\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -41,7 +47,7 @@
     "cypress-cloud",
     "flaky-tests"
   ],
-  "author": "JADEV GROUP SARL <info@jadev-group.com> (https://jadev-group.com)",
+  "author": "JADEV GROUP SARL (https://www.jadev-corp.com)",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -54,21 +60,21 @@
   "engines": {
     "node": ">=22.12.0"
   },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.1",
-    "tinyglobby": "^0.2.17",
-    "tree-kill": "^1.2.2",
-    "zod": "^4.6.7"
-  },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@modelcontextprotocol/server": "^2.4.0",
     "@types/node": "^22.20.5",
     "@typescript-eslint/eslint-plugin": "^8.71.2",
     "@typescript-eslint/parser": "^8.71.2",
     "eslint": "^9.39.5",
     "prettier": "^3.9.10",
+    "tinyglobby": "^0.2.17",
+    "tree-kill": "^1.2.2",
     "tsup": "^8.5.0",
     "typescript": "^5.8.0",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
     "cypress": ">=12.0.0"

@@ -1,0 +1,6 @@
+{
+  "name": "cypress-mcp-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Real Cypress projects driven through cypress-mcp. Cypress, @cypress/grep and typescript are installed here by the workflow (npm install --prefix test/e2e), so every project below resolves them."
+}

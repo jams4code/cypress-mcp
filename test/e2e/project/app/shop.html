@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Shop</title>
+  </head>
+  <body>
+    <main>
+      <h1>Shop</h1>
+      <form aria-label="Sign in">
+        <input data-cy="email" type="email" placeholder="Email" />
+        <button data-cy="login-btn" type="button">Log in</button>
+      </form>
+      <p hidden>Hidden text the outline leaves out</p>
+    </main>
+    <script>
+      // What the failure context should pick up: a console error and a failed request.
+      console.error("cart failed to load");
+      fetch("api/missing.json").catch(() => {});
+    </script>
+  </body>
+</html>

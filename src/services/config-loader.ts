@@ -13,17 +13,69 @@ import { ConfigNotFoundError } from "../utils/errors.js";
 import { normalizePath } from "../utils/paths.js";
 import type { Logger } from "../utils/logger.js";
 
+/** Size and modification time of each file a config was built from. */
+type Fingerprint = Map<string, string>;
+
 export class ConfigLoader {
-  private cached: CypressMcpConfig | null = null;
+  private cached: { config: CypressMcpConfig; fingerprint: Fingerprint } | null = null;
+  /** Build in progress; concurrent callers share it, so `reading` has one writer. */
+  private pending: Promise<CypressMcpConfig> | null = null;
+  /** Files read while building the config being loaded, with their stamp at read time */
+  private reading: Fingerprint = new Map();
 
   constructor(
     private readonly projectRoot: string,
     private readonly logger: Logger,
   ) {}
 
+  /**
+   * Resolved config. Cached, but rebuilt as soon as any file it was built from
+   * (Cypress config, its relative imports, the support file,
+   * cypress-mcp.config.json) changes, appears or disappears, so edits made
+   * during a session apply to the next tool call.
+   */
   async load(): Promise<CypressMcpConfig> {
-    if (this.cached) return this.cached;
+    if (this.cached && (await this.isUnchanged(this.cached.fingerprint))) {
+      return this.cached.config;
+    }
 
+    this.pending ??= this.rebuild().finally(() => {
+      this.pending = null;
+    });
+    return this.pending;
+  }
+
+  private async rebuild(): Promise<CypressMcpConfig> {
+    // Stamp every candidate file first, so creating a config file that did
+    // not exist yet also invalidates the cache.
+    this.reading = new Map();
+    for (const file of [SERVER_CONFIG_FILE, ...CYPRESS_CONFIG_FILES]) {
+      const absolute = path.join(this.projectRoot, file);
+      this.reading.set(absolute, await stamp(absolute));
+    }
+
+    const config = await this.build();
+    this.cached = { config, fingerprint: this.reading };
+    return config;
+  }
+
+  private async isUnchanged(fingerprint: Fingerprint): Promise<boolean> {
+    for (const [file, previous] of fingerprint) {
+      if ((await stamp(file)) !== previous) {
+        this.logger.info("Config input changed, reloading", { file });
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** Read a file and remember its stamp, taken before the read. */
+  private async readTracked(absolute: string): Promise<string> {
+    this.reading.set(absolute, await stamp(absolute));
+    return fs.readFile(absolute, "utf-8");
+  }
+
+  private async build(): Promise<CypressMcpConfig> {
     const serverConfig = await this.loadServerConfig();
     const configFile = await this.findCypressConfig(serverConfig?.cypressConfigFile);
     if (!configFile) {
@@ -32,10 +84,14 @@ export class ConfigLoader {
 
     const configHints = await this.loadConfigHints(configFile);
 
-    this.cached = {
+    const config: CypressMcpConfig = {
       projectRoot: normalizePath(this.projectRoot),
       cypressConfigFile: normalizePath(configFile),
-      defaultBrowser: serverConfig?.defaultBrowser ?? DEFAULT_CONFIG.defaultBrowser,
+      // Only an explicit choice is passed on: Cypress picks its own default
+      // (the project's config, then Electron) when --browser is absent.
+      ...(serverConfig?.defaultBrowser
+        ? { defaultBrowser: serverConfig.defaultBrowser }
+        : {}),
       defaultTimeout: serverConfig?.defaultTimeout ?? DEFAULT_CONFIG.defaultTimeout,
       screenshotsDir:
         serverConfig?.screenshotsDir ??
@@ -54,6 +110,7 @@ export class ConfigLoader {
       titleFilterSupport:
         serverConfig?.titleFilterSupport ??
         (await this.detectTitleFilterSupport(configFile, configHints.supportFile)),
+      failureContext: serverConfig?.failureContext ?? DEFAULT_CONFIG.failureContext,
       // Same precedence as Cypress itself: env var over config file
       projectId:
         serverConfig?.projectId ??
@@ -66,7 +123,7 @@ export class ConfigLoader {
       projectRoot: this.projectRoot,
     });
 
-    return this.cached;
+    return config;
   }
 
   private async findCypressConfig(override?: string): Promise<string | null> {
@@ -77,6 +134,7 @@ export class ConfigLoader {
 
       try {
         await fs.access(fullPath);
+        this.reading.set(fullPath, await stamp(fullPath));
         return path.isAbsolute(override)
           ? normalizePath(path.relative(this.projectRoot, fullPath))
           : normalizePath(override);
@@ -100,7 +158,7 @@ export class ConfigLoader {
   private async loadServerConfig(): Promise<RawServerConfig | null> {
     const configPath = path.join(this.projectRoot, SERVER_CONFIG_FILE);
     try {
-      const raw = await fs.readFile(configPath, "utf-8");
+      const raw = await this.readTracked(configPath);
       const parsed: unknown = JSON.parse(raw);
       if (typeof parsed === "object" && parsed !== null) {
         this.logger.info("Server config loaded", { path: configPath });
@@ -144,7 +202,7 @@ export class ConfigLoader {
 
     let content = "";
     try {
-      content = await fs.readFile(absolute, "utf-8");
+      content = await this.readTracked(absolute);
     } catch {
       return {};
     }
@@ -175,7 +233,7 @@ export class ConfigLoader {
     filesToScan.add(normalizePath(configAbsolute));
 
     try {
-      const configContent = await fs.readFile(configAbsolute, "utf-8");
+      const configContent = await this.readTracked(configAbsolute);
       for (const importedFile of resolveRelativeImports(configAbsolute, configContent)) {
         filesToScan.add(normalizePath(importedFile));
       }
@@ -188,11 +246,18 @@ export class ConfigLoader {
         ? supportFile
         : path.join(this.projectRoot, supportFile);
       filesToScan.add(normalizePath(supportAbsolute));
+    } else if (supportFile === undefined) {
+      // Not set in the config: Cypress uses its default support file.
+      for (const candidate of DEFAULT_SUPPORT_FILES) {
+        filesToScan.add(normalizePath(path.join(this.projectRoot, candidate)));
+      }
     }
 
     for (const file of filesToScan) {
       try {
-        const content = await fs.readFile(file, "utf-8");
+        // Tracked so that wiring @cypress/grep into the support file mid
+        // session enables cypress_run_test without a restart.
+        const content = await this.readTracked(file);
         if (TITLE_FILTER_PATTERN.test(content)) {
           return true;
         }
@@ -205,6 +270,16 @@ export class ConfigLoader {
   }
 }
 
+/** "size:mtime" of a file, or "missing". */
+async function stamp(file: string): Promise<string> {
+  try {
+    const stat = await fs.stat(file);
+    return `${stat.size}:${stat.mtimeMs}`;
+  } catch {
+    return "missing";
+  }
+}
+
 interface ConfigHints {
   readonly projectId?: string;
   readonly specPattern?: readonly string[];
@@ -212,6 +287,11 @@ interface ConfigHints {
   readonly screenshotsDir?: string;
   readonly downloadsDir?: string;
 }
+
+/** Cypress's default e2e support file, `cypress/support/e2e.{js,jsx,ts,tsx}`. */
+const DEFAULT_SUPPORT_FILES = ["js", "jsx", "ts", "tsx"].map(
+  (ext) => `cypress/support/e2e.${ext}`,
+);
 
 const TITLE_FILTER_PATTERN =
   /(@cypress\/grep|cypress-grep|registerCypressGrep|grepFilterSpecs|grepOmitFiltered)/;

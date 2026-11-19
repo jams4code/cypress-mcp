@@ -4,6 +4,14 @@
     "rootDir": ".",
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
-  "exclude": ["node_modules", "dist", "test/fixtures"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test/fixtures",
+    "test/e2e"
+  ]
 }

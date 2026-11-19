@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import { OutputParser, extractCloudRun } from "../../src/services/output-parser.js";
 import { createLogger } from "../../src/utils/logger.js";
 import passingFixture from "../fixtures/reporter-output/passing.json";
@@ -7,6 +8,10 @@ import mixedFixture from "../fixtures/reporter-output/mixed.json";
 import flakyFixture from "../fixtures/reporter-output/flaky.json";
 
 const parser = new OutputParser(createLogger(false));
+const compileErrorOutput = readFileSync(
+  "test/fixtures/cypress-output/compile-error.txt",
+  "utf-8",
+);
 
 describe("OutputParser", () => {
   it("should parse a fully passing test run", () => {
@@ -156,5 +161,89 @@ ${JSON.stringify(passingFixture)}
   it("should not report Cloud info for local runs", () => {
     expect(parser.parse(JSON.stringify(passingFixture), "", 0).cloud).toBeUndefined();
     expect(extractCloudRun("no cloud here")).toBeUndefined();
+  });
+});
+
+describe("OutputParser compile errors", () => {
+  it("puts the bundler's message in error instead of the results table", () => {
+    const result = parser.parse(compileErrorOutput, "", 1);
+
+    expect(result.errorKind).toBe("compile");
+    expect(result.error).toContain("Can't resolve './does-not-exist'");
+    expect(result.error).not.toContain("Compiler.js");
+    expect(result.stdoutTail).toContain("Run Finished");
+  });
+});
+
+describe("OutputParser with report files", () => {
+  const report = (spec: string, failed: boolean) => ({
+    spec,
+    stats: {
+      suites: 1,
+      tests: 1,
+      passes: failed ? 0 : 1,
+      pending: 0,
+      failures: failed ? 1 : 0,
+      start: "",
+      end: "",
+      duration: 100,
+    },
+    tests: [
+      {
+        title: "t",
+        fullTitle: `${spec} t`,
+        duration: 5,
+        currentRetry: 0,
+        err: failed ? { message: "boom" } : {},
+      },
+    ],
+    pending: [],
+    failures: failed
+      ? [
+          {
+            title: "t",
+            fullTitle: `${spec} t`,
+            duration: 5,
+            err: { message: "boom", stack: "" },
+          },
+        ]
+      : [],
+    passes: failed ? [] : [{ title: "t", fullTitle: `${spec} t`, duration: 5, err: {} }],
+  });
+
+  it("merges the specs of one launch, each test tagged with its spec", () => {
+    const parser = new OutputParser(createLogger(false));
+    const result = parser.parse("", "", 1, [
+      report("a.cy.js", true),
+      report("b.cy.js", false),
+    ]);
+
+    expect(result.stats).toMatchObject({
+      tests: 2,
+      passing: 1,
+      failing: 1,
+      duration: 200,
+    });
+    expect(result.failures).toMatchObject([{ spec: "a.cy.js", error: "boom" }]);
+    expect(result.tests.map((t) => t.spec)).toEqual(["a.cy.js", "b.cy.js"]);
+  });
+
+  it("keeps a spec that did not compile as a failure when others ran", () => {
+    const parser = new OutputParser(createLogger(false));
+    const stdout = [
+      "Oops...we found an error preparing this test file:",
+      "  > cypress/e2e/broken.cy.js",
+      "Error: Webpack Compilation Error",
+      "Module not found: Error: Can't resolve './x'",
+    ].join("\n");
+    const result = parser.parse(stdout, "", 1, [report("a.cy.js", false)]);
+
+    expect(result.success).toBe(false);
+    expect(result.failures).toMatchObject([
+      {
+        spec: "cypress/e2e/broken.cy.js",
+        fullTitle: "cypress/e2e/broken.cy.js did not compile",
+      },
+    ]);
   });
 });

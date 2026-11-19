@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="380" viewBox="0 0 960 380" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>How cypress-mcp works</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="959" height="379" rx="16" fill="#ffffff" stroke="#e2e8f0"/>
+
+  <!-- Agent -->
+  <rect x="30" y="80" width="200" height="130" rx="12" fill="#1a1a2e" stroke="#e94560" stroke-width="2"/>
+  <text x="130" y="128" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">AI coding agent</text>
+  <text x="130" y="156" text-anchor="middle" font-size="13" fill="#cbd5e1">Claude Code, Codex, Copilot,</text>
+  <text x="130" y="175" text-anchor="middle" font-size="13" fill="#cbd5e1">Cursor, Gemini CLI, Zed</text>
+
+  <!-- Server -->
+  <rect x="380" y="80" width="200" height="130" rx="12" fill="#16213e" stroke="#4f8cff" stroke-width="2"/>
+  <text x="480" y="128" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">cypress-mcp</text>
+  <text x="480" y="156" text-anchor="middle" font-size="13" fill="#cbd5e1">4 tools, one runId per run</text>
+  <text x="480" y="175" text-anchor="middle" font-size="13" fill="#cbd5e1">text + structuredContent</text>
+
+  <!-- Cypress -->
+  <rect x="730" y="80" width="200" height="130" rx="12" fill="#0f3460" stroke="#8b5cf6" stroke-width="2"/>
+  <text x="830" y="128" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">Cypress</text>
+  <text x="830" y="156" text-anchor="middle" font-size="13" fill="#cbd5e1">your project and config,</text>
+  <text x="830" y="175" text-anchor="middle" font-size="13" fill="#cbd5e1">left unchanged</text>
+
+  <!-- Agent <-> server -->
+  <line x1="232" y1="118" x2="376" y2="118" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="304" y="106" text-anchor="middle" font-size="12" fill="#334155">MCP over stdio</text>
+  <line x1="378" y1="172" x2="234" y2="172" stroke="#e94560" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="306" y="194" text-anchor="middle" font-size="12" fill="#334155">failure: file:line,</text>
+  <text x="306" y="210" text-anchor="middle" font-size="12" fill="#334155">error, page, screenshot</text>
+
+  <!-- Server <-> Cypress -->
+  <line x1="582" y1="118" x2="726" y2="118" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="654" y="100" text-anchor="middle" font-size="12" fill="#334155">cypress run with</text>
+  <text x="654" y="112" text-anchor="middle" font-size="12" fill="#334155">a wrapper config</text>
+  <line x1="728" y1="172" x2="584" y2="172" stroke="#8b5cf6" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="656" y="194" text-anchor="middle" font-size="12" fill="#334155">per test events,</text>
+  <text x="656" y="210" text-anchor="middle" font-size="12" fill="#334155">DOM, console, network</text>
+
+  <!-- Run folder -->
+  <line x1="480" y1="212" x2="480" y2="268" stroke="#94a3b8" stroke-width="2" stroke-dasharray="5 5"/>
+  <rect x="290" y="270" width="380" height="76" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-dasharray="6 4"/>
+  <text x="480" y="300" text-anchor="middle" font-size="13" fill="#1e293b" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">node_modules/.cache/cypress-mcp/runs/&lt;runId&gt;/</text>
+  <text x="480" y="324" text-anchor="middle" font-size="12" fill="#64748b">wrapper config, support file, reports, screenshots</text>
+</svg>

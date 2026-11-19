@@ -1,161 +1,118 @@
 // Copyright (c) 2026 JADEV GROUP SARL
 // SPDX-License-Identifier: Apache-2.0
-import { z } from "zod";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+
+// Shared code of the legacy run tools (cypress_run_spec, cypress_run_test,
+// cypress_rerun_last), enabled with --caps legacy. They return the 0.2.x JSON
+// envelope; cypress_run is the compact replacement.
+import type { CallToolResult, ServerContext } from "@modelcontextprotocol/server";
 import type { ToolContext } from "../../types/index.js";
-import type { CloudRecordArgs, CypressRunArgs } from "../../types/cypress.js";
+import type { CypressRunArgs } from "../../types/cypress.js";
 import type { RunRecord } from "../../services/state-store.js";
-import { CypressMcpError } from "../../utils/errors.js";
-import {
-  buildRunNextActions,
-  buildRunSummary,
-  enrichRunResult,
-} from "../../utils/run-results.js";
+import { executeCypressRun } from "../../services/run-executor.js";
+import { buildRunNextActions, buildRunSummary } from "../../utils/run-results.js";
+import { progressNotifier } from "../run-shared.js";
+import { legacyErrorResult, legacyResult } from "../result.js";
 
-/** Input fields shared by every tool that starts a Cypress run. */
-export const runOptionsSchema = {
-  browser: z.string().optional().describe("Browser: electron, chrome, firefox, edge"),
-  headed: z.boolean().optional().describe("Run in headed mode (visible browser)"),
-  timeout: z
-    .number()
-    .int()
-    .min(1_000)
-    .max(3_600_000)
-    .optional()
-    .describe("Timeout in ms (default: 300000)"),
-  env: z
-    .record(z.string().min(1), z.string())
-    .optional()
-    .describe(
-      "Cypress env values, read in tests with cy.env() (Cypress 15.10+) or Cypress.env()",
-    ),
-};
+/** Titles listed when run_test matched nothing; enough to pick from without flooding the context. */
+const MAX_LISTED_TITLES = 100;
 
-/**
- * Cypress Cloud recording. The record key never appears here: Cypress reads
- * CYPRESS_RECORD_KEY from the server environment.
- */
-export const cloudOptionsSchema = {
-  record: z
-    .boolean()
-    .optional()
-    .describe(
-      "Record this run to Cypress Cloud (needs projectId and CYPRESS_RECORD_KEY). The result includes the Cloud run URL, which Cypress Cloud MCP tools accept.",
-    ),
-  tags: z
-    .array(
-      z
-        .string()
-        .min(1)
-        .max(100)
-        .regex(/^[^,]+$/, "Tags cannot contain commas"),
-    )
-    .max(20)
-    .optional()
-    .describe("Cloud run tags, e.g. ['local', 'agent']"),
-  group: z.string().min(1).max(200).optional().describe("Cloud run group name"),
-  ciBuildId: z
-    .string()
-    .min(1)
-    .max(200)
-    .optional()
-    .describe("Cloud build id, to attach several recorded runs to one Cloud run"),
-};
-
-export function toCloudArgs(input: {
-  record?: boolean;
-  tags?: string[];
-  group?: string;
-  ciBuildId?: string;
-}): CloudRecordArgs | undefined {
-  if (!input.record) {
-    return undefined;
-  }
-  return {
-    record: true,
-    tags: input.tags,
-    group: input.group,
-    ciBuildId: input.ciBuildId,
-  };
+/** Prefix of every legacy tool description. */
+export function deprecated(replacement: string, description: string): string {
+  return `Deprecated, removed in 0.5: use ${replacement}. ${description}`;
 }
 
-interface ExecuteRunOptions {
+interface LegacyRunOptions {
   readonly tool: string;
   readonly kind: RunRecord["kind"];
-  readonly spec: string;
+  readonly specs: readonly string[];
+  readonly prefix?: string;
   readonly args: CypressRunArgs;
   readonly testName?: string;
   readonly previousRunId?: string;
-  readonly includeDiscoverOnSuccess?: boolean;
+  readonly request?: ServerContext;
 }
 
-/** Run Cypress, record the run in session state and build the tool response. */
-export async function executeRun(
+/** Run Cypress, record the run and build the 0.2.x JSON response. */
+export async function executeLegacyRun(
   ctx: ToolContext,
-  options: ExecuteRunOptions,
+  options: LegacyRunOptions,
 ): Promise<CallToolResult> {
-  const { tool, kind, spec, args, testName } = options;
-
-  const raw = await ctx.processManager.run(args);
-  const result = ctx.outputParser.parse(raw.stdout, raw.stderr, raw.exitCode);
-
-  const screenshots = await ctx.screenshotResolver.find(spec, testName);
-  const enriched = enrichRunResult(
-    result,
-    screenshots.length > 0 ? screenshots : result.screenshots,
-  );
-
-  const record = ctx.stateStore.recordRun(
-    kind,
-    spec,
+  const { tool, args, testName } = options;
+  const spec = options.specs[0] ?? args.spec;
+  const progress = progressNotifier(options.request);
+  const outcome = await executeCypressRun(ctx, {
+    kind: options.kind,
+    specs: options.specs,
     args,
-    enriched,
-    raw.stdout,
-    raw.stderr,
-  );
+    prefix: options.prefix,
+    signal: options.request?.mcpReq.signal,
+    onProgress: progress.onProgress,
+  });
+  await progress.flush();
+  const { record } = outcome;
+  const result = record.result;
+  const previous = options.previousRunId ? { previousRunId: options.previousRunId } : {};
 
-  return {
-    content: [
+  if (outcome.type === "no_match") {
+    const query = args.grep ?? "";
+    const { titles, closestMatches } = outcome;
+    return legacyResult(
       {
-        type: "text" as const,
-        text: JSON.stringify(
-          {
-            ok: !enriched.error,
-            tool,
-            runId: record.runId,
-            summary: buildRunSummary(enriched, spec, testName),
-            ...(options.previousRunId ? { previousRunId: options.previousRunId } : {}),
-            data: enriched,
-            nextActions: buildRunNextActions(enriched, {
-              includeDiscoverOnSuccess: options.includeDiscoverOnSuccess,
-            }),
-          },
-          null,
-          2,
-        ),
+        ok: false,
+        tool,
+        runId: record.runId,
+        summary: `No test matched "${query}" in ${spec}: nothing passed or failed, so nothing was tested.`,
+        ...previous,
+        data: {
+          code: "NO_TEST_MATCHED",
+          testName: query,
+          closestMatches,
+          testTitles: titles.slice(0, MAX_LISTED_TITLES),
+          ...(titles.length > MAX_LISTED_TITLES ? { testTitleCount: titles.length } : {}),
+          stats: result.stats,
+        },
+        nextActions:
+          closestMatches.length > 0
+            ? [
+                `cypress_run_test with testName set to one of data.closestMatches, e.g. "${closestMatches[0]}"`,
+                "cypress_run_spec to run the whole spec",
+              ]
+            : ["cypress_analyze_spec to see the tests in this spec", "cypress_run_spec"],
       },
-    ],
-  };
-}
-
-/** Standard error envelope for known failures; unknown errors are rethrown. */
-export function toolError(tool: string, err: unknown): CallToolResult {
-  if (!(err instanceof CypressMcpError)) {
-    throw err;
+      true,
+    );
   }
-  return {
-    content: [
+
+  if (outcome.type === "timeout") {
+    return legacyResult(
       {
-        type: "text" as const,
-        text: JSON.stringify({
-          ok: false,
-          tool,
-          summary: err.message,
-          data: err.toJSON(),
-          nextActions: ["cypress_doctor"],
-        }),
+        ok: false,
+        tool,
+        runId: record.runId,
+        summary: buildRunSummary(result, spec, testName),
+        ...previous,
+        // code and suggestion as in the error envelope 0.2.1 returned for timeouts
+        data: { ...outcome.error.toJSON(), ...result },
+        nextActions: buildRunNextActions(result),
       },
-    ],
-    isError: true,
-  };
+      true,
+    );
+  }
+
+  // A run that never produced a report (compile error, Cypress crash) is a
+  // tool error: 0.2.x returned ok: false without isError.
+  return legacyResult(
+    {
+      ok: !result.error,
+      tool,
+      runId: record.runId,
+      summary: buildRunSummary(result, spec, testName),
+      ...previous,
+      data: result,
+      nextActions: buildRunNextActions(result),
+    },
+    Boolean(result.error),
+  );
 }
+
+export { legacyErrorResult as toolError };

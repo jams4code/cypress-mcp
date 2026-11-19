@@ -14,7 +14,9 @@ describe("ConfigLoader", () => {
     const config = await loader.load();
 
     expect(config.cypressConfigFile).toBe("cypress.config.ts");
-    expect(config.defaultBrowser).toBe("electron");
+    // No browser unless cypress-mcp.config.json asks for one, so Cypress keeps
+    // the project's own default instead of being forced onto Electron.
+    expect(config.defaultBrowser).toBeUndefined();
     expect(config.defaultTimeout).toBe(300_000);
     expect(config.specPattern).toEqual(["cypress/e2e/**/*.cy.{ts,js}"]);
     expect(config.supportFile).toBe("cypress/support/e2e.ts");
@@ -130,5 +132,116 @@ describe("ConfigLoader", () => {
       else process.env["CYPRESS_PROJECT_ID"] = previous;
       await fs.rm(tempRoot, { recursive: true, force: true });
     }
+  });
+
+  describe("reloads when an input file changes", () => {
+    async function withProject(
+      files: Record<string, string>,
+      run: (
+        root: string,
+        write: (file: string, body: string) => Promise<void>,
+      ) => Promise<void>,
+    ): Promise<void> {
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), "cypress-mcp-config-"));
+      // Each write gets a later mtime, so the change is seen even on file
+      // systems with coarse timestamps.
+      let tick = Date.now() / 1000;
+      const write = async (file: string, body: string): Promise<void> => {
+        const absolute = path.join(root, file);
+        await fs.mkdir(path.dirname(absolute), { recursive: true });
+        await fs.writeFile(absolute, body);
+        tick += 10;
+        await fs.utimes(absolute, tick, tick);
+      };
+      try {
+        for (const [file, body] of Object.entries(files)) {
+          await write(file, body);
+        }
+        await run(root, write);
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+
+    it("returns the cached config while nothing changes", async () => {
+      await withProject(
+        { "cypress.config.js": "module.exports = { e2e: {} };" },
+        async (root) => {
+          const loader = new ConfigLoader(root, logger);
+          expect(await loader.load()).toBe(await loader.load());
+        },
+      );
+    });
+
+    it("picks up a new specPattern in the Cypress config", async () => {
+      await withProject(
+        {
+          "cypress.config.js":
+            "module.exports = { e2e: { specPattern: 'a/**/*.cy.js' } };",
+        },
+        async (root, write) => {
+          const loader = new ConfigLoader(root, logger);
+          expect((await loader.load()).specPattern).toEqual(["a/**/*.cy.js"]);
+
+          await write(
+            "cypress.config.js",
+            "module.exports = { e2e: { specPattern: 'b/**/*.cy.js' } };",
+          );
+          expect((await loader.load()).specPattern).toEqual(["b/**/*.cy.js"]);
+        },
+      );
+    });
+
+    it("enables title filtering once @cypress/grep is added to the support file", async () => {
+      await withProject(
+        {
+          "cypress.config.js": "module.exports = { e2e: {} };",
+          "cypress/support/e2e.js": "// nothing yet\n",
+        },
+        async (root, write) => {
+          const loader = new ConfigLoader(root, logger);
+          expect((await loader.load()).titleFilterSupport).toBe(false);
+
+          await write("cypress/support/e2e.js", "require('@cypress/grep')();\n");
+          expect((await loader.load()).titleFilterSupport).toBe(true);
+        },
+      );
+    });
+
+    it("follows changes in a relative import of the config", async () => {
+      await withProject(
+        {
+          "cypress.config.js":
+            "const shared = require('./shared');\nmodule.exports = shared;",
+          "shared.js": "module.exports = { screenshotsFolder: 'shots/one' };",
+        },
+        async (root, write) => {
+          const loader = new ConfigLoader(root, logger);
+          expect((await loader.load()).screenshotsDir).toBe("shots/one");
+
+          await write(
+            "shared.js",
+            "module.exports = { screenshotsFolder: 'shots/two' };",
+          );
+          expect((await loader.load()).screenshotsDir).toBe("shots/two");
+        },
+      );
+    });
+
+    it("notices a cypress-mcp.config.json created after the first load", async () => {
+      await withProject(
+        { "cypress.config.js": "module.exports = { e2e: {} };" },
+        async (root, write) => {
+          const loader = new ConfigLoader(root, logger);
+          expect((await loader.load()).defaultBrowser).toBeUndefined();
+
+          await write(
+            "cypress-mcp.config.json",
+            JSON.stringify({ defaultBrowser: "chrome" }),
+          );
+          expect((await loader.load()).defaultBrowser).toBe("chrome");
+        },
+      );
+    });
   });
 });

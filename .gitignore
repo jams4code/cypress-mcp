@@ -28,5 +28,6 @@ coverage/
 *.tgz
 
 # E2E project artifacts
-test/e2e/project/cypress/screenshots/
-test/e2e/project/cypress/videos/
+test/e2e/**/cypress/screenshots/
+test/e2e/**/cypress/videos/
+test/e2e/**/results/

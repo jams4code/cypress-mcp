@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildChildEnv, buildCliArgs } from "../../src/services/process-manager.js";
+import {
+  buildChildEnv,
+  buildCliArgs,
+  parseCypressInfoBrowsers,
+} from "../../src/services/process-manager.js";
 import type { CypressRunArgs } from "../../src/types/cypress.js";
 
 const base: CypressRunArgs = { spec: "cypress/e2e/login.cy.ts" };
@@ -24,6 +28,22 @@ describe("buildCliArgs", () => {
       "--browser",
       "chrome",
     ]);
+  });
+
+  it("leaves --browser out when no browser was asked for", () => {
+    // Cypress then uses the project's browser setting instead of Electron.
+    expect(buildCliArgs({ ...base, configFile: "cypress.config.ts" })).not.toContain(
+      "--browser",
+    );
+  });
+
+  it("passes the given reporter, json by default", () => {
+    const reporter = "/opt/cypress-mcp/reporter/cypress-mcp-reporter.cjs";
+
+    expect(valueAfter(buildCliArgs(base), "--reporter")).toBe("json");
+    expect(valueAfter(buildCliArgs(base, { expose: true }, reporter), "--reporter")).toBe(
+      reporter,
+    );
   });
 
   it("passes shell metacharacters through as one literal argument", () => {
@@ -110,5 +130,107 @@ describe("buildChildEnv", () => {
     expect(
       buildChildEnv({ CYPRESS_RECORD_KEY: "k" }, recordArgs)["CYPRESS_RECORD_KEY"],
     ).toBe("k");
+  });
+});
+
+describe("parseCypressInfoBrowsers", () => {
+  it("reads names and channels and always allows Electron", () => {
+    // Cypress 16.3 on macOS: Electron is not listed but still runs.
+    const output = [
+      "Displaying Cypress info...",
+      "",
+      "Detected 1 browser installed:",
+      "",
+      "1. Chrome",
+      "  - Name: chrome",
+      "  - Channel: stable",
+      "  - Version: 157.0.8103.79",
+      "  - Executable: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "",
+      "Note: to run these browsers, pass <name>:<channel> to the '--browser' field",
+      "",
+      "Cypress Version: 16.3.0 (stable)",
+    ].join("\n");
+
+    expect(parseCypressInfoBrowsers(output)).toEqual([
+      "chrome",
+      "chrome:stable",
+      "electron",
+    ]);
+  });
+
+  it("lists every channel of a browser, with Windows line endings", () => {
+    const output = [
+      "1. Chrome",
+      "  - Name: chrome",
+      "  - Channel: stable",
+      "2. Chrome Beta",
+      "  - Name: chrome",
+      "  - Channel: beta",
+      "3. Edge",
+      "  - Name: edge",
+      "  - Channel: stable",
+    ].join("\r\n");
+
+    expect(parseCypressInfoBrowsers(output)).toEqual([
+      "chrome",
+      "chrome:beta",
+      "chrome:stable",
+      "edge",
+      "edge:stable",
+      "electron",
+    ]);
+  });
+
+  it("allows only Electron when no browser is detected", () => {
+    expect(parseCypressInfoBrowsers("Detected no browsers installed")).toEqual([
+      "electron",
+    ]);
+  });
+});
+
+describe("buildCliArgs with a run workspace", () => {
+  const base = { spec: "cypress/e2e/a.cy.js", grep: "logs in" };
+  const workspace = {
+    dir: "/p/node_modules/.cache/cypress-mcp/runs/run_1-9",
+    screenshotsDir: "/p/node_modules/.cache/cypress-mcp/runs/run_1-9/screenshots",
+    videosDir: "/p/node_modules/.cache/cypress-mcp/runs/run_1-9/videos",
+    reportsDir: "/p/node_modules/.cache/cypress-mcp/runs/run_1-9/reports",
+    contextFile: "/p/node_modules/.cache/cypress-mcp/runs/run_1-9/context.jsonl",
+  };
+
+  it("sends screenshots to the run folder and keeps the reporter and grep without a wrapper", () => {
+    const args = buildCliArgs(base, { expose: true }, "/r.cjs", workspace);
+    expect(JSON.parse(args[args.indexOf("--config") + 1]!)).toEqual({
+      screenshotsFolder: workspace.screenshotsDir,
+      videosFolder: workspace.videosDir,
+    });
+    expect(args).toContain("--reporter");
+    expect(args).toContain("--expose");
+  });
+
+  it("lets the wrapper set the reporter and filter titles", () => {
+    const wrapped = {
+      ...workspace,
+      wrapperConfigFile: "node_modules/.cache/x/cypress-mcp.config.cjs",
+    };
+    const args = buildCliArgs(
+      { ...base, configFile: "cypress.config.js", component: true },
+      { expose: true },
+      "/r.cjs",
+      wrapped,
+    );
+    expect(args.slice(0, 2)).toEqual(["run", "--component"]);
+    expect(args).not.toContain("--reporter");
+    expect(args).not.toContain("--expose");
+    expect(args[args.indexOf("--config-file") + 1]).toBe(wrapped.wrapperConfigFile);
+  });
+
+  it("tells the reporter where the run folder is", () => {
+    const env = buildChildEnv({ MCP_CYPRESS_RUN_DIR: "stale" }, base, workspace);
+    expect(env["MCP_CYPRESS_RUN_DIR"]).toBe(workspace.dir);
+    expect(
+      buildChildEnv({ MCP_CYPRESS_RUN_DIR: "stale" }, base)["MCP_CYPRESS_RUN_DIR"],
+    ).toBeUndefined();
   });
 });

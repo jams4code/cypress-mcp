@@ -1,8 +1,16 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   classifyConfigRuntimeCheck,
+  extractCompileError,
   extractDiagnosticSnippet,
 } from "../../src/utils/cypress-diagnostics.js";
+
+// Output of Cypress 16.3 for a spec importing a missing file, local paths replaced.
+const compileErrorOutput = readFileSync(
+  "test/fixtures/cypress-output/compile-error.txt",
+  "utf-8",
+);
 
 describe("cypress diagnostics", () => {
   it("should extract the most useful config error snippet", () => {
@@ -42,5 +50,22 @@ describe("cypress diagnostics", () => {
 
     expect(result.status).toBe("fail");
     expect(result.detail).toContain("Your configFile is invalid");
+  });
+
+  it("should extract the cause of a spec that does not compile", () => {
+    const error = extractCompileError(compileErrorOutput, "");
+
+    expect(error).toBe(
+      [
+        "Oops...we found an error preparing this test file:",
+        "  > cypress/e2e/broken.cy.js",
+        "Error: Webpack Compilation Error",
+        "Module not found: Error: Can't resolve './does-not-exist' in '/home/dev/shop/cypress/e2e'",
+      ].join("\n"),
+    );
+  });
+
+  it("should find no compile error in a normal run", () => {
+    expect(extractCompileError("  Running:  a.cy.js\n  (Results)", "")).toBeUndefined();
   });
 });

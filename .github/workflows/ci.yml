@@ -6,8 +6,11 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
+# Nothing by default; each job asks for what it needs.
+permissions: {}
+
+# Actions are pinned to commit SHAs; Dependabot updates the SHA and the
+# version comment together.
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -16,6 +19,8 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -23,9 +28,9 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         node-version: [22, 24]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -42,11 +47,12 @@ jobs:
         shell: bash
         run: |
           npm pack --dry-run --json > pack.json
-          for f in bin/cypress-mcp.mjs dist/index.js LICENSE NOTICE README.md package.json; do
+          for f in bin/cypress-mcp.mjs dist/index.js dist/THIRD_PARTY_NOTICES.md reporter/cypress-mcp-reporter.cjs runtime/config.cjs runtime/support.js skill/SKILL.md LICENSE NOTICE README.md package.json; do
             node -e "const p=require('./pack.json')[0].files.map(f=>f.path); if(!p.includes(process.argv[1])){console.error('missing from package: '+process.argv[1]);process.exit(1)}" "$f"
           done
 
-      - name: Audit production dependencies
+      - name: Audit the bundled packages
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
-        # Moderate and above fail, except advisories in audit-allowlist.json until their date.
+        # Moderate and above fail for any package inside dist/index.js, except
+        # advisories in audit-allowlist.json until their date.
         run: node scripts/audit-prod.mjs

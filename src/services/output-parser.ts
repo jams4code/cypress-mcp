@@ -8,8 +8,12 @@ import type {
   TestResult,
   TestState,
 } from "../types/results.js";
-import { extractDiagnosticSnippet } from "../utils/cypress-diagnostics.js";
+import {
+  extractCompileError,
+  extractDiagnosticSnippet,
+} from "../utils/cypress-diagnostics.js";
 import type { Logger } from "../utils/logger.js";
+import type { SpecReport } from "./run-workspace.js";
 
 const ANSI_PATTERN = /\u001b\[[0-9;]*[A-Za-z]/g;
 
@@ -25,15 +29,74 @@ const REPORT_START_PATTERN = /\{\s*"stats"\s*:/g;
 export class OutputParser {
   constructor(private readonly logger: Logger) {}
 
-  parse(stdout: string, stderr: string, exitCode: number | null): CypressRunResult {
+  /**
+   * Results of a run. `reports` are the per-spec files the reporter wrote to
+   * the run folder; without them (an older run layout, a crash before any
+   * spec ran) the report is looked for in stdout.
+   */
+  parse(
+    stdout: string,
+    stderr: string,
+    exitCode: number | null,
+    reports: readonly SpecReport[] = [],
+  ): CypressRunResult {
     const cloud = extractCloudRun(`${stdout}\n${stderr}`);
-    const json = this.extractJson(stdout);
 
-    const result = json
-      ? this.normalizeReport(json)
-      : this.createErrorResult(stdout, stderr, exitCode);
+    let result: CypressRunResult;
+    if (reports.length > 0) {
+      result = this.mergeReports(reports, stdout, stderr);
+    } else {
+      const json = this.extractJson(stdout);
+      result = json
+        ? this.normalizeReport(json)
+        : this.createErrorResult(stdout, stderr, exitCode);
+    }
 
     return cloud ? { ...result, cloud } : result;
+  }
+
+  /**
+   * One result for every spec of the run. A spec that did not compile writes
+   * no report; when others did, it becomes a failure so it is not lost.
+   */
+  private mergeReports(
+    reports: readonly SpecReport[],
+    stdout: string,
+    stderr: string,
+  ): CypressRunResult {
+    const parts = reports.map((report) => this.normalizeReport(report, report.spec));
+    const failures = parts.flatMap((part) => part.failures);
+
+    const compileError = extractCompileError(stdout, stderr);
+    if (compileError) {
+      const spec = /^\s*>\s*(\S.*)$/m.exec(compileError)?.[1]?.trim();
+      failures.push({
+        ...(spec ? { spec } : {}),
+        title: "the spec did not compile",
+        fullTitle: `${spec ?? "A spec"} did not compile`,
+        error: compileError,
+        stack: "",
+      });
+    }
+
+    const sum = (key: keyof CypressRunResult["stats"]): number =>
+      parts.reduce((total, part) => total + part.stats[key], 0);
+    return {
+      success: failures.length === 0,
+      stats: {
+        tests: sum("tests"),
+        passing: sum("passing"),
+        failing: failures.length,
+        pending: sum("pending"),
+        skipped: sum("skipped"),
+        flaky: sum("flaky"),
+        duration: sum("duration"),
+      },
+      tests: parts.flatMap((part) => part.tests),
+      failures,
+      screenshots: [],
+      videos: [],
+    };
   }
 
   private extractJson(stdout: string): MochaJsonReport | null {
@@ -125,7 +188,8 @@ export class OutputParser {
     );
   }
 
-  private normalizeReport(report: MochaJsonReport): CypressRunResult {
+  private normalizeReport(report: MochaJsonReport, spec?: string): CypressRunResult {
+    const inSpec = spec ? { spec } : {};
     const failed = new Set(report.failures.map((t) => t.fullTitle));
     const pending = new Set(report.pending.map((t) => t.fullTitle));
     const passed = new Set(report.passes.map((t) => t.fullTitle));
@@ -135,6 +199,7 @@ export class OutputParser {
       const retries = t.currentRetry ?? 0;
 
       return {
+        ...inSpec,
         title: t.title,
         fullTitle: t.fullTitle,
         state,
@@ -152,6 +217,7 @@ export class OutputParser {
     });
 
     const failures: FailureDetail[] = report.failures.map((t) => ({
+      ...inSpec,
       title: t.title,
       fullTitle: t.fullTitle,
       error: t.err?.message ?? "Unknown error",
@@ -182,28 +248,51 @@ export class OutputParser {
     stderr: string,
     exitCode: number | null,
   ): CypressRunResult {
+    const stdoutTail = stdout.trim().slice(-2000) || undefined;
+    const stderrTail = stderr.trim().slice(-2000) || undefined;
+
+    // The cause of a compile error sits above the results table and is lost
+    // from the tails, so it is lifted into `error`.
+    const compileError = extractCompileError(stdout, stderr);
+    if (compileError) {
+      return {
+        ...emptyResult(),
+        error: compileError,
+        errorKind: "compile",
+        stdoutTail,
+        stderrTail,
+      };
+    }
+
     const diagnostic = extractDiagnosticSnippet(stdout, stderr);
 
     return {
-      success: false,
-      stats: {
-        tests: 0,
-        passing: 0,
-        failing: 0,
-        pending: 0,
-        skipped: 0,
-        flaky: 0,
-        duration: 0,
-      },
-      tests: [],
-      failures: [],
-      screenshots: [],
-      videos: [],
+      ...emptyResult(),
       error: `Cypress process exited with code ${exitCode ?? "unknown"}. Output: ${diagnostic}`,
-      stdoutTail: stdout.trim().slice(-2000) || undefined,
-      stderrTail: stderr.trim().slice(-2000) || undefined,
+      stdoutTail,
+      stderrTail,
     };
   }
+}
+
+/** A result with no tests, for runs that never produced a report. */
+export function emptyResult(): CypressRunResult {
+  return {
+    success: false,
+    stats: {
+      tests: 0,
+      passing: 0,
+      failing: 0,
+      pending: 0,
+      skipped: 0,
+      flaky: 0,
+      duration: 0,
+    },
+    tests: [],
+    failures: [],
+    screenshots: [],
+    videos: [],
+  };
 }
 
 /** Find the Cypress Cloud run URL that `cypress run --record` prints. Exported for tests. */

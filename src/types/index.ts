@@ -20,6 +20,10 @@ export type {
   TestResult,
   TestError,
   FailureDetail,
+  PageContext,
+  ConsoleEntry,
+  FailedRequest,
+  CommandEntry,
   DiscoveryResult,
   SpecSummary,
   SpecAnalysis,
@@ -34,8 +38,20 @@ import type { SpecFinder } from "../services/spec-finder.js";
 import type { ScreenshotResolver } from "../services/screenshot-resolver.js";
 import type { StateStore } from "../services/state-store.js";
 import type { Logger } from "../utils/logger.js";
+import type { ProjectRegistry } from "../services/projects.js";
 
 export interface ToolContext {
+  /** Absolute root of this Cypress project: --cwd, or a project folder under it */
+  readonly projectRoot: string;
+  /** Absolute --cwd root, which paths shown to the agent are relative to */
+  readonly serverRoot: string;
+  /** Every project under the server root (monorepos) */
+  readonly projects: ProjectRegistry;
+  /**
+   * Set when Cypress could not load this project's config through the
+   * wrapper: later runs skip it. Holds the reason.
+   */
+  wrapperDisabled?: string;
   readonly processManager: ProcessManager;
   readonly outputParser: OutputParser;
   readonly configLoader: ConfigLoader;

@@ -1,0 +1,1 @@
+window.variantSupportLoaded = true;

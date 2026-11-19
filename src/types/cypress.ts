@@ -41,12 +41,20 @@ export interface MochaError {
 
 /** Arguments for spawning a Cypress run */
 export interface CypressRunArgs {
+  /** `--spec` value: one spec, a glob, or a comma-separated list (project relative) */
   readonly spec: string;
   readonly browser?: string;
   readonly headed?: boolean;
   readonly timeout?: number;
   readonly env?: Readonly<Record<string, string>>;
+  /** Title substring (testName). Filtered in the browser runtime, or by @cypress/grep without it */
   readonly grep?: string;
+  /** Exact full titles to run (file:line targets) */
+  readonly titles?: readonly string[];
+  /** Register each selected test this many times */
+  readonly repeat?: number;
+  /** Component testing (`cypress run --component`) */
+  readonly component?: boolean;
   readonly configFile?: string;
   readonly cloud?: CloudRecordArgs;
 }

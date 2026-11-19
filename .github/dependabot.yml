@@ -15,11 +15,17 @@ updates:
       prefix: "fix(deps)"
       prefix-development: "chore(deps)"
     groups:
+      # Bundled into dist/index.js, so they ship with every release although
+      # package.json lists them as devDependencies. First match wins.
+      bundled:
+        patterns:
+          - "@modelcontextprotocol/server"
+          - "tinyglobby"
+          - "tree-kill"
+          - "zod"
+        update-types: [minor, patch]
       dev-dependencies:
         dependency-type: development
-        update-types: [minor, patch]
-      production-dependencies:
-        dependency-type: production
         update-types: [minor, patch]
 
   - package-ecosystem: github-actions

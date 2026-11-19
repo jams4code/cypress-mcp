@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { StateStore } from "../../src/services/state-store.js";
+import { MAX_STORED_RUNS, StateStore } from "../../src/services/state-store.js";
 import type { CypressRunResult } from "../../src/types/results.js";
 import type { CypressRunArgs } from "../../src/types/cypress.js";
 
@@ -102,5 +102,32 @@ describe("StateStore", () => {
     );
 
     expect(store.getScreenshots("spec.cy.ts")).toEqual([]);
+  });
+});
+
+describe("StateStore runs by id", () => {
+  it("returns each run by its id and the latest for last", () => {
+    const store = new StateStore();
+    const first = store.recordRun("run_spec", "a.cy.ts", mockArgs, mockResult, "", "");
+    const second = store.recordRun("run_spec", "b.cy.ts", mockArgs, mockResult, "", "");
+
+    expect(store.getRun(first.runId)).toBe(first);
+    expect(store.getRun(second.runId)).toBe(second);
+    expect(store.getRun("last")).toBe(second);
+    expect(store.getRun()).toBe(second);
+    expect(store.getRun("run_unknown")).toBeNull();
+    expect(store.runIds()).toEqual([second.runId, first.runId]);
+  });
+
+  it("keeps the latest runs only", () => {
+    const store = new StateStore();
+    store.clear();
+    for (let i = 0; i < MAX_STORED_RUNS + 5; i++) {
+      store.recordRun("run_spec", "a.cy.ts", mockArgs, mockResult, "", "");
+    }
+
+    expect(store.runIds()).toHaveLength(MAX_STORED_RUNS);
+    expect(store.getRun("run_1")).toBeNull();
+    expect(store.getRun(`run_${MAX_STORED_RUNS + 5}`)).not.toBeNull();
   });
 });

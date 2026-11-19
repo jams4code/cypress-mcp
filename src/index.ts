@@ -1,86 +1,85 @@
 // Copyright (c) 2026 JADEV GROUP SARL
 // SPDX-License-Identifier: Apache-2.0
-import path from "node:path";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createServer } from "./server.js";
-import { ConfigLoader } from "./services/config-loader.js";
-import { ProcessManager } from "./services/process-manager.js";
-import { OutputParser } from "./services/output-parser.js";
-import { SpecFinder } from "./services/spec-finder.js";
-import { ScreenshotResolver } from "./services/screenshot-resolver.js";
-import { StateStore } from "./services/state-store.js";
-import { DEFAULT_CONFIG } from "./types/config.js";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { createServer, SERVER_VERSION } from "./server.js";
+import { createToolContext } from "./context.js";
+import { CAPABILITIES, parseCaps } from "./caps.js";
+import { CLI_USAGE, runCli } from "./cli.js";
 import { createLogger } from "./utils/logger.js";
-import type { ToolContext } from "./types/index.js";
+import { resolveProjectRoot } from "./utils/paths.js";
+import { abortAllRuns } from "./services/process-manager.js";
 
 export async function main(argv: string[]): Promise<void> {
-  const cwd = parseCwd(argv);
+  const [command] = argv;
+  if (command === "run") {
+    process.exitCode = await runCli(argv.slice(1));
+    return;
+  }
+  if (command === "--help" || command === "-h" || command === "help") {
+    process.stdout.write(`${CLI_USAGE}\n`);
+    return;
+  }
+  if (command === "--version" || command === "-V") {
+    process.stdout.write(`${SERVER_VERSION}\n`);
+    return;
+  }
+
+  await startServer(argv);
+}
+
+async function startServer(argv: string[]): Promise<void> {
+  const cwd = resolveProjectRoot(argv, process.env, process.cwd());
   const verbose = argv.includes("--verbose") || argv.includes("-v");
   const logger = createLogger(verbose);
+  const { caps, unknown } = parseCaps(argv, process.env);
 
-  logger.info("Starting cypress-mcp server", { cwd, verbose });
+  logger.info("Starting cypress-mcp server", {
+    cwd,
+    caps: [...caps],
+    version: SERVER_VERSION,
+  });
+  if (unknown.length > 0) {
+    logger.warn("Ignoring unknown --caps values", {
+      unknown,
+      known: [...Object.keys(CAPABILITIES), "all"],
+    });
+  }
 
-  const configLoader = new ConfigLoader(cwd, logger);
+  const ctx = createToolContext(cwd, logger);
 
   // Load eagerly so misconfiguration shows up in the logs right away.
   // A missing config is not fatal: tools load it again on every call.
   try {
-    await configLoader.load();
+    await ctx.configLoader.load();
   } catch (err) {
     logger.warn("Could not load config at startup, tools will retry on demand", {
       error: err instanceof Error ? err.message : String(err),
     });
   }
 
-  const ctx: ToolContext = {
-    processManager: new ProcessManager(cwd, logger),
-    outputParser: new OutputParser(logger),
-    configLoader,
-    specFinder: new SpecFinder(cwd, logger),
-    screenshotResolver: new ScreenshotResolver(
-      cwd,
-      async () => {
-        try {
-          return (await configLoader.load()).screenshotsDir;
-        } catch {
-          return DEFAULT_CONFIG.screenshotsDir;
-        }
-      },
-      logger,
-    ),
-    stateStore: new StateStore(),
-    logger,
-  };
-
-  const server = createServer(ctx);
-  const transport = new StdioServerTransport();
+  // serveStdio answers both protocol eras: 2025 clients that open with
+  // initialize, and 2026-07-28 clients that send per-request metadata.
+  serveStdio(() => createServer(ctx, caps), {
+    onerror: (error) => logger.error("Transport error", { error: error.message }),
+  });
 
   // The client closing stdin is the normal way an MCP session ends. Kill any
   // running Cypress so it cannot outlive the session, then let Node exit on
   // its own once pending responses are flushed.
-  const onDisconnect = (): void => {
+  process.stdin.on("end", () => {
     logger.info("Client disconnected");
-    void ctx.processManager.abort();
-  };
-  transport.onclose = onDisconnect;
-  process.stdin.on("end", onDisconnect);
+    void abortAllRuns();
+  });
 
   const onSignal = async (signal: string): Promise<void> => {
     logger.info("Shutting down", { signal });
-    await ctx.processManager.abort();
+    await abortAllRuns();
     process.exit(0);
   };
   process.on("SIGINT", () => void onSignal("SIGINT"));
   process.on("SIGTERM", () => void onSignal("SIGTERM"));
 
-  await server.connect(transport);
-  logger.info("Server connected, waiting for requests");
-}
-
-function parseCwd(argv: string[]): string {
-  const cwdIndex = argv.indexOf("--cwd");
-  const cwdValue = cwdIndex !== -1 ? argv[cwdIndex + 1] : undefined;
-  return path.resolve(cwdValue ?? process.cwd());
+  logger.info("Server ready on stdio");
 }
 
 // Auto-start when run directly

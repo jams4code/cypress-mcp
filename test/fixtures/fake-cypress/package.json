@@ -1,0 +1,9 @@
+{
+  "name": "cypress",
+  "version": "16.3.0",
+  "private": true,
+  "description": "Stand-in for the Cypress CLI, copied into node_modules/cypress of a temp project by test/integration/agent-flows.test.ts.",
+  "bin": {
+    "cypress": "bin/cypress"
+  }
+}

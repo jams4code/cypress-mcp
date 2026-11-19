@@ -1,0 +1,92 @@
+
+================================================================================
+
+  (Run Starting)
+
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Cypress:        16.3.0                                                                         │
+  │ Browser:        Electron 150 (headless) (deprecated)                                           │
+  │ Node Version:   v24.15.0 (/usr/local/bin/node)                    │
+  │ Specs:          1 found (broken.cy.js)                                                         │
+  │ Searched:       cypress/e2e/broken.cy.js                                                       │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+Warning: The Electron browser is deprecated as a test browser and will be removed in a future version of Cypress.
+
+Switch to Chrome or another installed browser to avoid a breaking change when you upgrade.
+
+Read more about supported browsers: https://on.cypress.io/launching-browsers
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                    
+  Running:  broken.cy.js                                                                    (1 of 1)
+
+Oops...we found an error preparing this test file:
+
+  > cypress/e2e/broken.cy.js
+
+The error was:
+
+Error: Webpack Compilation Error
+Module not found: Error: Can't resolve './does-not-exist' in '/home/dev/shop/cypress/e2e'
+    at handle (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/packages/server/node_modules/@cypress/webpack-preprocessor/dist/index.js:302:23)
+    at finalCallback (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/webpack/lib/Compiler.js:500:32)
+    at /home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/webpack/lib/Compiler.js:578:17
+    at /home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/webpack/lib/HookWebpackError.js:67:2
+    at Hook.eval [as callAsync] (eval at create (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/tapable/lib/HookCodeFactory.js:33:10), <anonymous>:6:1)
+    at Hook.CALL_ASYNC_DELEGATE [as _callAsync] (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/tapable/lib/Hook.js:18:14)
+    at Cache.storeBuildDependencies (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/webpack/lib/Cache.js:126:37)
+    at /home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/webpack/lib/Compiler.js:574:19
+    at Hook.eval [as callAsync] (eval at create (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/tapable/lib/HookCodeFactory.js:33:10), <anonymous>:6:1)
+    at Hook.CALL_ASYNC_DELEGATE [as _callAsync] (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/tapable/lib/Hook.js:18:14)
+    at /home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/webpack/lib/Compiler.js:570:23
+    at Compiler.emitRecords (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/webpack/lib/Compiler.js:1046:4)
+    at /home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/webpack/lib/Compiler.js:560:11
+    at /home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/webpack/lib/Compiler.js:1009:14
+    at Hook.eval [as callAsync] (eval at create (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/tapable/lib/HookCodeFactory.js:33:10), <anonymous>:6:1)
+    at Hook.CALL_ASYNC_DELEGATE [as _callAsync] (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/tapable/lib/Hook.js:18:14)
+    at /home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/webpack/lib/Compiler.js:1006:27
+    at /home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/neo-async/async.js:2818:7
+    at done (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/neo-async/async.js:3522:9)
+    at Hook.eval [as callAsync] (eval at create (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/tapable/lib/HookCodeFactory.js:33:10), <anonymous>:6:1)
+    at Hook.CALL_ASYNC_DELEGATE [as _callAsync] (/home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/tapable/lib/Hook.js:18:14)
+    at /home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/webpack/lib/Compiler.js:835:33
+    at /home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/node_modules/graceful-fs/graceful-fs.js:143:16
+    at /home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/packages/server/node_modules/graceful-fs/graceful-fs.js:143:16
+    at /home/dev/.cache/Cypress/16.3.0/Cypress/resources/app/packages/server/node_modules/graceful-fs/graceful-fs.js:61:14
+    at FSReqCallback.oncomplete (node:fs:185:23)
+
+This occurred while Cypress was compiling and bundling your test code. This is usually caused by:
+
+- A missing file or dependency
+- A syntax error in the file or one of its dependencies
+
+Fix the error in your code and re-run your tests.
+
+  (Results)
+
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Tests:        0                                                                                │
+  │ Passing:      0                                                                                │
+  │ Failing:      1                                                                                │
+  │ Pending:      0                                                                                │
+  │ Skipped:      0                                                                                │
+  │ Screenshots:  0                                                                                │
+  │ Video:        false                                                                            │
+  │ Duration:     0 seconds                                                                        │
+  │ Spec Ran:     broken.cy.js                                                                     │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+
+  (Run Finished)
+
+
+       Spec                                              Tests  Passing  Failing  Pending  Skipped  
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ ✖  broken.cy.js                               0ms        -        -        1        -        - │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ✖  1 of 1 failed (100%)                       0ms        -        -        1        -        -  
+

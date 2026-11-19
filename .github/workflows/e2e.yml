@@ -1,7 +1,9 @@
 name: E2E
 
-# Drives a real Cypress project through the MCP protocol. Cypress 14 covers
-# the pre-15.10 CLI (no --expose); latest catches breaking Cypress releases.
+# Drives real Cypress projects through the MCP protocol and the CLI: a CJS
+# project with a junit reporter, and TS (ESM and CJS) and MJS configs that the
+# failure context wrapper must load. Cypress 14 covers the pre-15.10 CLI (no
+# --expose) and ts-node configs; latest catches breaking Cypress releases.
 # The weekly run tests new Cypress versions even when nothing changed here.
 
 on:
@@ -13,8 +15,11 @@ on:
     - cron: "17 5 * * 1"
   workflow_dispatch:
 
-permissions:
-  contents: read
+# Nothing by default; each job asks for what it needs.
+permissions: {}
+
+# Actions are pinned to commit SHAs; Dependabot updates the SHA and the
+# version comment together.
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -24,6 +29,8 @@ jobs:
   cypress:
     name: Cypress ${{ matrix.cypress }} (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -33,9 +40,9 @@ jobs:
           - { os: ubuntu-latest, cypress: "latest", grep: "latest" }
           - { os: windows-latest, cypress: "latest", grep: "latest" }
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -43,15 +50,21 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+      # In test/e2e, so every project under it resolves the same install.
+      # typescript: the TS config variants need it on Cypress versions that
+      # load TS configs through ts-node.
       - name: Install Cypress ${{ matrix.cypress }}
-        run: npm install --prefix test/e2e/project --no-save --no-package-lock --no-audit --no-fund cypress@${{ matrix.cypress }} @cypress/grep@${{ matrix.grep }}
+        run: npm install --prefix test/e2e --no-save --no-package-lock --no-audit --no-fund cypress@${{ matrix.cypress }} @cypress/grep@${{ matrix.grep }} typescript@5
 
+      # The first Cypress launch verifies the binary; do it once here so the smoke checks time real work.
+      - run: npx --prefix test/e2e cypress verify
       - run: node test/e2e/smoke.mjs
 
       - name: Upload screenshots
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: screenshots-${{ matrix.os }}-cypress-${{ matrix.cypress }}
-          path: test/e2e/project/cypress/screenshots
+          # Each run keeps its screenshots in its own folder since 0.4.
+          path: test/e2e/**/node_modules/.cache/cypress-mcp/runs/*/screenshots
           if-no-files-found: ignore

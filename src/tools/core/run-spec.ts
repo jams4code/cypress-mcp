@@ -1,52 +1,43 @@
 // Copyright (c) 2026 JADEV GROUP SARL
 // SPDX-License-Identifier: Apache-2.0
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { ToolContext } from "../../types/index.js";
-import type { CypressRunArgs } from "../../types/cypress.js";
-import {
-  cloudOptionsSchema,
-  executeRun,
-  runOptionsSchema,
-  toCloudArgs,
-  toolError,
-} from "./execute-run.js";
+import { cloudOptionsShape, prepareRun, runOptionsShape } from "../run-shared.js";
+import { RUNS_CYPRESS } from "../result.js";
+import { deprecated, executeLegacyRun, toolError } from "./execute-run.js";
 
 const TOOL = "cypress_run_spec";
 
 export function register(server: McpServer, ctx: ToolContext): void {
-  server.tool(
+  server.registerTool(
     TOOL,
-    "Run a single Cypress spec file headless. Returns structured results with pass/fail/flaky counts, failure details, screenshot paths, the Cypress Cloud run URL when recorded, and recommended next actions.",
     {
-      spec: z.string().describe("Path to the spec file relative to project root"),
-      ...runOptionsSchema,
-      ...cloudOptionsSchema,
+      title: "Run Cypress spec (deprecated)",
+      description: deprecated(
+        "cypress_run",
+        "Run a single Cypress spec file headless. Returns the 0.2 JSON results with failure details, screenshot paths and next actions.",
+      ),
+      inputSchema: z.object({
+        spec: z.string().describe("Path to the spec file relative to project root"),
+        ...runOptionsShape,
+        ...cloudOptionsShape,
+      }),
+      annotations: RUNS_CYPRESS,
     },
-    async ({ spec, browser, headed, timeout, env, ...cloud }) => {
+    async (input, request) => {
       try {
-        const resolvedSpec = await ctx.specFinder.resolveSpec(spec);
-        const config = await ctx.configLoader.load();
-
-        const args: CypressRunArgs = {
-          spec: resolvedSpec,
-          browser: browser ?? config.defaultBrowser,
-          headed,
-          timeout: timeout ?? config.defaultTimeout,
-          env,
-          configFile: config.cypressConfigFile,
-          cloud: toCloudArgs(cloud),
-        };
-
-        return await executeRun(ctx, {
+        const run = await prepareRun(ctx, input);
+        return await executeLegacyRun(run.ctx, {
           tool: TOOL,
           kind: "run_spec",
-          spec: resolvedSpec,
-          args,
-          includeDiscoverOnSuccess: true,
+          specs: run.specs,
+          prefix: run.prefix,
+          args: run.args,
+          request,
         });
       } catch (err) {
-        return toolError(TOOL, err);
+        return toolError(TOOL, err, ctx.logger);
       }
     },
   );

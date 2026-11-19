@@ -3,6 +3,39 @@
 import path from "node:path";
 import { createRequire } from "node:module";
 
+/**
+ * Value of `--cwd`, given as `--cwd <dir>` or `--cwd=<dir>`. The MCP Registry
+ * describes named arguments as `--flag=value`, and clients that install from
+ * it may pass that form.
+ */
+export function parseCwdArg(argv: readonly string[]): string | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--cwd") {
+      return argv[i + 1];
+    }
+    if (arg.startsWith("--cwd=")) {
+      return arg.slice("--cwd=".length);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Root of the Cypress project the server works on: `--cwd` when given, else
+ * CLAUDE_PROJECT_DIR, which Claude Code sets in the environment of the servers
+ * it starts (its docs ask servers to read it rather than rely on the working
+ * directory), else the directory the client started the server in.
+ */
+export function resolveProjectRoot(
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+  startDir: string,
+): string {
+  const fromEnv = env["CLAUDE_PROJECT_DIR"]?.trim();
+  return path.resolve(parseCwdArg(argv) ?? (fromEnv || startDir));
+}
+
 /** Normalize path separators to forward slashes */
 export function normalizePath(p: string): string {
   return p.replace(/\\/g, "/");

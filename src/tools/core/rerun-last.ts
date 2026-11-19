@@ -1,47 +1,51 @@
 // Copyright (c) 2026 JADEV GROUP SARL
 // SPDX-License-Identifier: Apache-2.0
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { ToolContext } from "../../types/index.js";
-import { executeRun, toolError } from "./execute-run.js";
+import { LAST_RUN } from "../../services/state-store.js";
+import { RunNotFoundError } from "../../utils/errors.js";
+import { RUNS_CYPRESS } from "../result.js";
+import { deprecated, executeLegacyRun, toolError } from "./execute-run.js";
 
 const TOOL = "cypress_rerun_last";
 
 export function register(server: McpServer, ctx: ToolContext): void {
-  server.tool(
+  server.registerTool(
     TOOL,
-    "Replay the exact last run_spec or run_test invocation, including its Cypress Cloud recording options. Removes friction when iterating on the same failure: no need to reconstruct arguments.",
-    {},
-    async () => {
-      const lastRun = ctx.stateStore.getLastRun();
-
-      if (!lastRun) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({
-                ok: false,
-                tool: TOOL,
-                summary: "No previous run to replay",
-                data: null,
-                nextActions: ["cypress_run_spec", "cypress_discover"],
-              }),
-            },
-          ],
-        };
-      }
-
+    {
+      title: "Rerun a Cypress run (deprecated)",
+      description: deprecated(
+        "cypress_run with the same arguments",
+        "Replay the exact arguments of a previous run_spec or run_test call, Cloud recording options included.",
+      ),
+      inputSchema: z.object({
+        runId: z
+          .string()
+          .min(1)
+          .default(LAST_RUN)
+          .describe('Run to replay; "last" is the latest run of this server'),
+      }),
+      annotations: RUNS_CYPRESS,
+    },
+    async ({ runId }, request) => {
       try {
-        return await executeRun(ctx, {
+        const previous = ctx.stateStore.getRun(runId);
+        if (!previous) {
+          throw new RunNotFoundError(runId, ctx.stateStore.runIds());
+        }
+        return await executeLegacyRun(ctx.projects.context(previous.projectRoot), {
           tool: TOOL,
-          kind: lastRun.kind,
-          spec: lastRun.spec,
-          args: lastRun.args,
-          testName: lastRun.args.grep,
-          previousRunId: lastRun.runId,
+          kind: previous.kind,
+          specs: previous.specs,
+          prefix: previous.prefix,
+          args: previous.args,
+          testName: previous.args.grep,
+          previousRunId: previous.runId,
+          request,
         });
       } catch (err) {
-        return toolError(TOOL, err);
+        return toolError(TOOL, err, ctx.logger);
       }
     },
   );

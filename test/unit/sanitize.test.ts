@@ -1,46 +1,60 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeEnv } from "../../src/utils/sanitize.js";
+import { describeEnv } from "../../src/utils/sanitize.js";
 
-describe("sanitizeEnv", () => {
-  it("should mask sensitive values", () => {
-    const env = {
-      API_KEY: "sk-1234567890abcdef",
-      BASE_URL: "https://example.com",
-      SECRET_TOKEN: "mytoken123",
-    };
+describe("describeEnv", () => {
+  // Values cypress_get_env returned in clear in 0.2.1, under keys the old
+  // name-based mask did not cover, plus ones it only partly masked.
+  const env = {
+    baseUrl: "https://alice:p4ssw0rd@staging.example.com",
+    adminPass: "hunter2-admin",
+    dbPwd: "s3cr3t-db",
+    stripe: "sk_live_51HxYzAbCdEf",
+    API_KEY: "sk-1234567890abcdef",
+    retries: 2,
+    headless: true,
+    proxy: null,
+    users: ["first@example.com"],
+    auth: { password: "secret123", username: "root-user" },
+  };
 
-    const result = sanitizeEnv(env);
-
-    expect(result["API_KEY"]).toContain("***");
-    expect(result["API_KEY"]).not.toBe("sk-1234567890abcdef");
-    expect(result["BASE_URL"]).toBe("https://example.com");
-    expect(result["SECRET_TOKEN"]).toContain("***");
+  it("returns every key with the type of its value", () => {
+    expect(describeEnv(env)).toEqual({
+      baseUrl: "string",
+      adminPass: "string",
+      dbPwd: "string",
+      stripe: "string",
+      API_KEY: "string",
+      retries: "number",
+      headless: "boolean",
+      proxy: "null",
+      users: "array",
+      auth: { password: "string", username: "string" },
+    });
   });
 
-  it("should preserve non-sensitive values", () => {
-    const env = { NODE_ENV: "test", PORT: "3000" };
-    const result = sanitizeEnv(env);
+  it("never returns any part of a value", () => {
+    const text = JSON.stringify(describeEnv(env));
+    const fragments = [
+      "alice",
+      "p4ssw0rd",
+      "hunter2",
+      "s3cr3t",
+      "sk_live",
+      "sk-12",
+      "secret123",
+      "root-user",
+      "first@",
+    ];
 
-    expect(result["NODE_ENV"]).toBe("test");
-    expect(result["PORT"]).toBe("3000");
+    for (const fragment of fragments) {
+      expect(text).not.toContain(fragment);
+    }
   });
 
-  it("should handle nested objects", () => {
-    const env = {
-      auth: { password: "secret123", username: "admin" },
-    };
+  it("stops descending into deeply nested objects", () => {
+    let nested: Record<string, unknown> = { leaf: "x" };
+    for (let i = 0; i < 20; i++) nested = { inner: nested };
 
-    const result = sanitizeEnv(env);
-    const auth = result["auth"] as Record<string, unknown>;
-
-    expect(auth["password"]).toContain("***");
-    expect(auth["username"]).toBe("admin");
-  });
-
-  it("should handle short sensitive values", () => {
-    const env = { API_KEY: "ab" };
-    const result = sanitizeEnv(env);
-
-    expect(result["API_KEY"]).toBe("***");
+    expect(() => JSON.stringify(describeEnv(nested))).not.toThrow();
   });
 });

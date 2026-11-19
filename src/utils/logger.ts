@@ -8,9 +8,11 @@ export interface Logger {
 }
 
 /**
- * All logging goes to stderr to keep stdout clean for MCP transport.
+ * All logging goes to stderr to keep stdout clean for MCP transport. `quiet`
+ * drops info lines: the CLI's stderr usually reaches the agent too, and only
+ * warnings and errors are worth its tokens there.
  */
-export function createLogger(verbose = false): Logger {
+export function createLogger(verbose = false, quiet = false): Logger {
   const write = (
     level: string,
     message: string,
@@ -23,7 +25,9 @@ export function createLogger(verbose = false): Logger {
   };
 
   return {
-    info: (msg, data) => write("INFO", msg, data),
+    info: (msg, data) => {
+      if (verbose || !quiet) write("INFO", msg, data);
+    },
     warn: (msg, data) => write("WARN", msg, data),
     error: (msg, data) => write("ERROR", msg, data),
     debug: (msg, data) => {

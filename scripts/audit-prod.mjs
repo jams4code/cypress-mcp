@@ -1,12 +1,21 @@
 // Copyright (c) 2026 JADEV GROUP SARL
 // SPDX-License-Identifier: Apache-2.0
 //
-// Production dependency audit for CI. Same gate as
-// `npm audit --omit=dev --audit-level=moderate`, except that advisories listed
-// in audit-allowlist.json are skipped until their `until` date. An expired
-// entry fails the gate, so nothing stays ignored by accident.
+// Audit of the code that ships, for CI. Since 0.3.0 the runtime dependencies
+// are bundled into dist/index.js and are devDependencies in package.json, so
+// `npm audit --omit=dev` would see nothing. This runs `npm audit` on the whole
+// tree and fails on moderate and above for any package that is in the bundle
+// (read from the build's metafile, so run it after `npm run build`).
+//
+// Advisories listed in audit-allowlist.json are skipped until their `until`
+// date. An expired entry fails the gate, so nothing stays ignored by accident.
+//
+// Packages that a bundled package vendors inside its own dist (the MCP SDK
+// ships ajv) are not in npm's tree, so npm audit cannot see them; they are
+// listed with their licenses in dist/THIRD_PARTY_NOTICES.md.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { bundledPackages } from "./third-party-notices.mjs";
 
 const FAILING = new Set(["moderate", "high", "critical"]);
 const today = new Date().toISOString().slice(0, 10);
@@ -25,9 +34,12 @@ for (const entry of allowlist) {
   }
 }
 
+const bundled = new Set(bundledPackages().direct);
+console.log(`Bundled packages: ${[...bundled].join(", ")}`);
+
 let raw;
 try {
-  raw = execFileSync("npm", ["audit", "--omit=dev", "--json"], {
+  raw = execFileSync("npm", ["audit", "--json"], {
     encoding: "utf8",
     shell: process.platform === "win32",
   });
@@ -38,7 +50,8 @@ try {
 const report = JSON.parse(raw);
 
 const seen = new Set();
-for (const vuln of Object.values(report.vulnerabilities ?? {})) {
+for (const [name, vuln] of Object.entries(report.vulnerabilities ?? {})) {
+  if (!bundled.has(name)) continue;
   for (const via of vuln.via) {
     // String entries point at another package whose advisory is listed on its own.
     if (typeof via === "string" || !FAILING.has(via.severity)) continue;
@@ -55,4 +68,4 @@ for (const vuln of Object.values(report.vulnerabilities ?? {})) {
 }
 
 if (failed) process.exit(1);
-console.log("Production audit passed.");
+console.log("Audit of the bundled packages passed.");
